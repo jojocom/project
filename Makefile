@@ -5,7 +5,7 @@ OUT2	= unit
 CC		= g++
 FLAGS	= -c -Wall
 
-all: main unit
+all: main unit test
 
 # main
 
@@ -26,6 +26,12 @@ unit_test.o: unit_test.cpp
 
 unit: $(OBJS2)
 	$(CC) $(OBJS2) -o $(OUT2)
+
+test.o: test.cpp
+	$(CC) $(FLAGS) test.cpp
+
+test: test.o
+	$(CC) test.o -o test
 
 # clean up
 
