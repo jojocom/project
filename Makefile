@@ -1,5 +1,5 @@
-OBJS1 	= main.o trie.o list.o
-OBJS2 	= unit_test.o trie.o list.o
+OBJS1 	= main.o trie.o list.o hash_functions.o
+OBJS2 	= unit_test.o trie.o list.o hash_functions.o
 OUT1	= ngrams
 OUT2	= unit
 CC		= g++
@@ -17,6 +17,9 @@ trie.o:  trie.cpp
 
 list.o:  list.cpp
 	$(CC) $(FLAGS) list.cpp
+
+hash_functions.o: hash_functions.cpp
+	$(CC) $(FLAGS) hash_functions.cpp
 
 main: $(OBJS1)
 	$(CC) $(OBJS1) -o $(OUT1)
