@@ -5,8 +5,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <fstream>
+#include <stdint.h>
 #include "trie.h"
 #include "list.h"
+#include "hash_functions.h"
+
+#define M 25000
 
 using namespace std;
 // constructor of trie nodes
@@ -375,7 +379,11 @@ void queryRead(char *queryFileName,Head *head){
                 temp = position + 1;
             }
             char **queryStart = query + 1;
-            ListHead *listHead = new ListHead();            // creating list for print
+            bool bitArray[M];
+            for (int i = 0; i < M; i++) {
+                bitArray[i] = 0;
+            }
+            // ListHead *listHead = new ListHead();            // creating list for print
             if(strcmp(query[0],"Q") == 0){              // for Q query
                 int found = 0;
                 for (int k = 0; k < whitespace; k++) {
@@ -383,7 +391,45 @@ void queryRead(char *queryFileName,Head *head){
                     for (int j = 1; j <= whitespace-k; j++) {
                         int x = searchNgram(temp,j,head);
                         if(x == 1){
-                            listHead->insertListNode(temp,j);   //insert Ngram to the list
+                            int length = 0;
+                            for (int d = 0; d < j; d++) {
+                                length += strlen(temp[d]);
+                            }
+                            char *mykey;
+                            mykey = (char *) malloc(sizeof(char)*(length + j));
+                            for (int d = 0; d < j; d++) {
+                                if(d == 0){
+                                    strcpy(mykey,temp[d]);
+                                }
+                                else{
+                                    strcat(mykey,temp[d]);
+                                }
+                                if(d != j-1){
+                                    strcat(mykey," ");
+                                }
+                            }
+                            int hash1 = murmurhash(mykey,(uint32_t) strlen(mykey),0) % M;
+                            int hash2 = hash_pearson(mykey) % M;
+                            int hash3 = hash_jenkins(mykey) % M;
+
+                            if((bitArray[hash1] == 0) || (bitArray[hash2] == 0) || (bitArray[hash3] == 0) || (bitArray[(hash3+hash1)%M] == 0) || (bitArray[(hash1+hash2)%M] == 0)){
+                                bitArray[hash1] = 1;
+                                bitArray[hash2] = 1;
+                                bitArray[hash3] = 1;
+                                bitArray[(hash3+hash1)%M] = 1;
+                                bitArray[(hash1+hash2)%M] = 1;
+
+                                if(found == 0){
+                                    cout << mykey;
+                                } else{
+                                    cout << "|";
+                                    cout << mykey;
+                                }
+                                // cout << "|";
+                                // cout << mykey;
+                            }
+                            free(mykey);
+                            // listHead->insertListNode(temp,j);   //insert Ngram to the list
                             found = 1;
                         } else if(x == 0){
                             break;
@@ -393,7 +439,7 @@ void queryRead(char *queryFileName,Head *head){
                 if(found == 0){
                     cout << "-1";               // if there are no Ngrams int the query
                 }
-                listHead->printList();              // printing Ngrams int the query, one time each one
+                // listHead->printList();              // printing Ngrams int the query, one time each one
                 cout << endl;
             }
             else if (strcmp(query[0],"A") == 0){              // for A query
@@ -406,7 +452,7 @@ void queryRead(char *queryFileName,Head *head){
                 printAll(head->root,0);
             }
 
-            delete listHead;
+            // delete listHead;
 
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);
