@@ -1,3 +1,5 @@
+#include "aaa.h"
+
 #define POOL_SIZE 20
 
 class Job {
@@ -24,12 +26,13 @@ public:
 struct JobScheduler{
 public:
     int execution_threads; // number of execution threads
-    Queue* q; // a queue that holds submitted jobs / tasks
-    p_thread_t* tids; // execution threads
+    Queue* queue; // a queue that holds submitted jobs / tasks
+    pthread_t* tids; // execution threads
 
-    JobScheduler* initialize_scheduler( int execution_threads);
-    void submit_job( JobScheduler* sch, Job* j);
-    void execute_all_jobs( JobScheduler* sch);
-    void wait_all_tasks_finish( JobScheduler* sch); //waits all submitted tasks to finish
-    OK_SUCCESS destroy_scheduler( JobScheduler* sch);
+    JobScheduler(int execution_threads);
+    ~JobScheduler();
+    void submit_job(Job* j);
+    void execute_all_jobs();
+    void wait_all_tasks_finish(); //waits all submitted tasks to finish
+    Job * obtain();
 };

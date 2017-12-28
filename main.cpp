@@ -6,12 +6,13 @@
 #include <fcntl.h>
 #include <fstream>
 #include "trie.h"
+// #include "jobScheduler.h"
 
 using namespace std;
 
 int main(int argc, char *argv[]) {                                              // ./ngrams -i <init_file> -q <query_file>
-    char * initFileName;
-    char * queryFileName;
+    char * initFileName = NULL;
+    char * queryFileName = NULL;
     int check1 = 0, check2 = 0;
 
 // reading parameters
@@ -34,11 +35,17 @@ int main(int argc, char *argv[]) {                                              
         return 0;
     }
     // create trie head
+    int compress = 0;
     Head *head;
-    head = trieCreate(initFileName);
+    head = trieCreate(initFileName,&compress);
 
-    // reading queries
-    queryRead(queryFileName,head);
+    if(compress == 0){
+        // reading queries
+        queryRead(queryFileName,head);
+    } else{
+        trieCompress(head);
+        queryStaticRead(queryFileName,head);
+    }
 
     delete [] initFileName;
     delete [] queryFileName;
