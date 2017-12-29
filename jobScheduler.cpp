@@ -7,12 +7,16 @@
 #include <fstream>
 #include <stdint.h>
 #include <pthread.h>
+#include "trie.h"
+#include "list.h"
+#include "hash_functions.h"
+#include "heap.h"
 #include "jobScheduler.h"
 
-
-
+pthread_mutex_t mtx;
+pthread_cond_t cond_nonempty;
+pthread_cond_t cond_nonfull;
 // Queue * queue;
-
 
 Job::Job(int newid,int newqueryLen,char **newquery):id(newid),queryLen(newqueryLen) {
     query = (char **) malloc(sizeof(char *)*newqueryLen);
@@ -63,17 +67,123 @@ void JobScheduler::submit_job(Job* data) {
     pthread_mutex_unlock(&mtx);
 }
 
-void *execute(void *arg){
-    char *temp;
-    return temp;
+void *executeDynamic(void *arg){
+    return NULL;
 }
 
-void JobScheduler::execute_all_jobs() {
+void *executeStatic(void *arg){
+
+
+    // obtain from scheduler's queue
+
+    // uint32_t bitArray[M];
+    // for (int i = 0; i < M; i++) {
+    //     bitArray[i] = 0;
+    // }
+    // char **queryStart = query + 1;
+    // if(strcmp(query[0],"Q") == 0){              // for Q query
+    //     int found = 0;
+    //     for (int k = 0; k < whitespace; k++) {
+    //         char **temp = queryStart + k;
+    //         for (int j = 1; j <= whitespace-k; j++) {
+    //             int x = searchNgramStatic(temp,j,head);
+    //             if(x == 1){
+    //                 int length = 0;
+    //                 for (int d = 0; d < j; d++) {
+    //                     length += strlen(temp[d]);
+    //                 }
+    //                 char *mykey;
+    //                 mykey = (char *) malloc(sizeof(char)*(length + j));
+    //                 for (int d = 0; d < j; d++) {
+    //                     if(d == 0){
+    //                         strcpy(mykey,temp[d]);
+    //                     }
+    //                     else{
+    //                         strcat(mykey,temp[d]);
+    //                     }
+    //                     if(d != j-1){
+    //                         strcat(mykey," ");
+    //                     }
+    //                 }
+    //                 int hash1 = murmurhash(mykey,(uint32_t) strlen(mykey),0) % (M*32);
+    //                 int hash2 = hash_pearson(mykey) % (M*32);
+    //                 int hash3 = hash_jenkins(mykey) % (M*32);
+    //
+    //                 if((bitChecker(bitArray[hash1/32],hash1%32) == 0) || (bitChecker(bitArray[hash2/32],hash2%32) == 0) || (bitChecker(bitArray[hash3/32],hash3%32) == 0) || (bitChecker(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32) == 0) || (bitChecker(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32) == 0)){
+    //                     bitArray[hash1/32] = bitChanger(bitArray[hash1/32],hash1%32);
+    //                     bitArray[hash2/32] = bitChanger(bitArray[hash2/32],hash2%32);
+    //                     bitArray[hash3/32] = bitChanger(bitArray[hash3/32],hash3%32);
+    //                     bitArray[((hash2+hash1)%(M*32))/32] = bitChanger(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32);
+    //                     bitArray[((hash3+hash1)%(M*32))/32] = bitChanger(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32);
+    //
+    //                     if(found == 0){
+    //                         cout << mykey;
+    //                     } else{
+    //                         cout << "|";
+    //                         cout << mykey;
+    //                     }
+    //                     heap->insertKey(mykey);
+    //                 }
+    //                 free(mykey);
+    //                 found = 1;
+    //             } else if(x == 0){
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     if(found == 0){
+    //         cout << "-1";               // if there are no Ngrams int the query
+    //     }
+    //     cout << endl;
+    // }
+    // else if (strcmp(query[0],"F") == 0){
+    //     if(whitespace != 0){
+    //         int k = atoi(query[1]);
+    //         cout << "Top: ";
+    //         for (int i = 0; i < k; i++) {
+    //             Element *el1 = heap->extractMax();
+    //             if(el1 != NULL){
+    //                 if( i == k-1){
+    //                     cout << el1->word << endl;
+    //                 } else{
+    //                     cout << el1->word << "|";
+    //                 }
+    //                 if(heap->elements != 0){
+    //                     delete el1;
+    //                 }
+    //             }
+    //         }
+    //         delete heap;
+    //         heap = new MaxHeap(HeapCap);
+    //     } else{
+    //         delete heap;
+    //         heap = new MaxHeap(HeapCap);
+    //     }
+    // }
+    // else if (strcmp(query[0],"P") == 0){
+    //     // printAll(head->root,0);
+    // }
+    //
+    // for(int i = 0; i <= whitespace; i++){
+    //     free(query[i]);
+    // }
+
+    return NULL;
+}
+
+void JobScheduler::execute_all_jobs(int type) {
     int err;
     for (int i = 0; i < execution_threads; i++) {
-        if((err = pthread_create(tids+i,NULL,execute,(void *)&err))) {
-            perror("pthread_create");
-            exit(1);
+        if( type == 0){
+            if((err = pthread_create(tids+i,NULL,executeDynamic,(void *)&err))) {
+                perror("pthread_create");
+                exit(1);
+            }
+        } else{
+            if((err = pthread_create(tids+i,NULL,executeStatic,(void *)&err))) {
+                perror("pthread_create");
+                exit(1);
+            }
         }
     }
 }

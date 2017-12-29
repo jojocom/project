@@ -11,6 +11,8 @@
 
 using namespace std;
 
+
+
 int main () {
 
     JobScheduler *sch = new JobScheduler(6);
@@ -37,9 +39,20 @@ int main () {
 
     Job *job = new Job(1,2,query);
     sch->submit_job(job);
+    sch->submit_job(job);
 
     Job *test;
     test = sch->obtain();
+
+    for (int i = 0; i < test->queryLen; i++) {
+        cout << test->query[i] << endl;
+    }
+
+    test = sch->obtain();
+
+    for (int i = 0; i < test->queryLen; i++) {
+        cout << test->query[i] << endl;
+    }
 
     delete sch;
 

@@ -1,6 +1,9 @@
-#include "aaa.h"
-
 #define POOL_SIZE 20
+
+extern pthread_mutex_t mtx;
+extern pthread_cond_t cond_nonempty;
+extern pthread_cond_t cond_nonfull;
+
 
 class Job {
 public:
@@ -32,7 +35,7 @@ public:
     JobScheduler(int execution_threads);
     ~JobScheduler();
     void submit_job(Job* j);
-    void execute_all_jobs();
+    void execute_all_jobs(int type);
     void wait_all_tasks_finish(); //waits all submitted tasks to finish
     Job * obtain();
 };
