@@ -1,6 +1,9 @@
+#include "heap.h"
+#include "trie.h"
 #define POOL_SIZE 20
 
-extern pthread_mutex_t mtx;
+extern pthread_mutex_t queue_mtx;
+extern pthread_mutex_t heap_mtx;
 extern pthread_cond_t cond_nonempty;
 extern pthread_cond_t cond_nonfull;
 
@@ -26,7 +29,7 @@ public:
     ~Queue();
 };
 
-struct JobScheduler{
+class JobScheduler{
 public:
     int execution_threads; // number of execution threads
     Queue* queue; // a queue that holds submitted jobs / tasks
@@ -35,7 +38,16 @@ public:
     JobScheduler(int execution_threads);
     ~JobScheduler();
     void submit_job(Job* j);
-    void execute_all_jobs(int type);
+    void execute_all_jobs(int type,Head *head,MaxHeap *heap,JobScheduler *scheduler);
     void wait_all_tasks_finish(); //waits all submitted tasks to finish
     Job * obtain();
+};
+
+class Parameter{
+public:
+    Head *head;
+    MaxHeap *heap;
+    JobScheduler *scheduler;
+
+    Parameter(Head *newhead,MaxHeap *newheap,JobScheduler *newscheduler);
 };

@@ -24,7 +24,7 @@ int main () {
         cout << "NULL2" << endl;
     }
 
-    pthread_mutex_init(&mtx, 0);
+    pthread_mutex_init(&queue_mtx, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
@@ -37,24 +37,41 @@ int main () {
 
     // sch->execute_all_jobs();
 
-    Job *job = new Job(1,2,query);
-    sch->submit_job(job);
-    sch->submit_job(job);
+    Job *job1 = new Job(1,2,query);
+    Job *job2 = new Job(1,2,query);
+    sch->submit_job(job1);
+    sch->submit_job(job2);
 
-    Job *test;
-    test = sch->obtain();
+    Job *test1;
+    test1 = sch->obtain();
 
-    for (int i = 0; i < test->queryLen; i++) {
-        cout << test->query[i] << endl;
+    for (int i = 0; i < test1->queryLen; i++) {
+        cout << test1->query[i] << endl;
     }
 
-    test = sch->obtain();
+    delete test1;
+    // cout << "\t1" << endl;
+    Job *test2;
+    // cout << "\t2" << endl;
+    test2 = sch->obtain();
+    // cout << "\t3" << endl;
 
-    for (int i = 0; i < test->queryLen; i++) {
-        cout << test->query[i] << endl;
+    for (int i = 0; i < test2->queryLen; i++) {
+        cout << test2->query[i] << endl;
     }
-
+    // cout << "\t4" << endl;
+    delete test2;
+    // cout << "\t5" << endl;
     delete sch;
+    // cout << "\t6" << endl;
+    for (int i = 0; i < 2; i++) {
+        free(query[i]);
+    }
+    free(query);
+
+    pthread_cond_destroy(&cond_nonempty);
+    pthread_cond_destroy(&cond_nonfull);
+    pthread_mutex_destroy(&queue_mtx);
 
     return(0);
 }

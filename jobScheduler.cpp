@@ -7,16 +7,14 @@
 #include <fstream>
 #include <stdint.h>
 #include <pthread.h>
-#include "trie.h"
 #include "list.h"
 #include "hash_functions.h"
-#include "heap.h"
 #include "jobScheduler.h"
 
-pthread_mutex_t mtx;
+pthread_mutex_t queue_mtx;
+pthread_mutex_t heap_mtx;
 pthread_cond_t cond_nonempty;
 pthread_cond_t cond_nonfull;
-// Queue * queue;
 
 Job::Job(int newid,int newqueryLen,char **newquery):id(newid),queryLen(newqueryLen) {
     query = (char **) malloc(sizeof(char *)*newqueryLen);
@@ -41,7 +39,6 @@ Queue::~Queue(){
     }
 }
 
-
 JobScheduler::JobScheduler( int newexecution_threads):execution_threads(newexecution_threads) {
     queue = new Queue();
     if((tids = (pthread_t*) malloc(newexecution_threads * sizeof(pthread_t))) == NULL) {
@@ -56,15 +53,15 @@ JobScheduler::~JobScheduler(){
 }
 
 void JobScheduler::submit_job(Job* data) {
-    pthread_mutex_lock(&mtx);
+    pthread_mutex_lock(&queue_mtx);
     while (queue->count >= POOL_SIZE) {
-        pthread_cond_wait(&cond_nonfull, &mtx);
+        pthread_cond_wait(&cond_nonfull, &queue_mtx);
     }
     queue->end = (queue->end + 1) % POOL_SIZE;
     queue->data[queue->end] = data;
     queue->count++;
     pthread_cond_broadcast(&cond_nonempty);
-    pthread_mutex_unlock(&mtx);
+    pthread_mutex_unlock(&queue_mtx);
 }
 
 void *executeDynamic(void *arg){
@@ -72,10 +69,33 @@ void *executeDynamic(void *arg){
 }
 
 void *executeStatic(void *arg){
+    cout << "thread" << endl;
+    Parameter *threadParameter = (Parameter *) arg;
 
-
+    Head *head = threadParameter->head;
+    MaxHeap *heap = threadParameter->heap;
+    JobScheduler *scheduler = threadParameter->scheduler;
     // obtain from scheduler's queue
-
+    cout << "a" << endl;
+    Job *job = scheduler->obtain();
+    cout << "b" << endl;
+    cout << "here" << endl;
+    if (job == NULL) {
+        cout << "null" << endl;
+    }
+    // char **query = job->query;
+    // cout << "here1" << endl;
+    // int whitespace = job->queryLen - 1;
+    // cout << "here2" << endl;
+    //
+    // cout << "id: " << job->id << " queryLen: " << job->queryLen << endl;
+    // for (int i = 0; i < job->queryLen; i++) {
+    //     cout << job->query[i] << " ";
+    // }
+    // cout << endl;
+    //
+    // cout << "aaa" << endl;
+    //
     // uint32_t bitArray[M];
     // for (int i = 0; i < M; i++) {
     //     bitArray[i] = 0;
@@ -171,16 +191,19 @@ void *executeStatic(void *arg){
     return NULL;
 }
 
-void JobScheduler::execute_all_jobs(int type) {
+void JobScheduler::execute_all_jobs(int type,Head *head,MaxHeap *heap,JobScheduler *scheduler) {
+
+    Parameter *threadParameter = new Parameter(head,heap,scheduler);
+
     int err;
     for (int i = 0; i < execution_threads; i++) {
         if( type == 0){
-            if((err = pthread_create(tids+i,NULL,executeDynamic,(void *)&err))) {
+            if((err = pthread_create(tids+i,NULL,executeDynamic,(void *)threadParameter))) {
                 perror("pthread_create");
                 exit(1);
             }
         } else{
-            if((err = pthread_create(tids+i,NULL,executeStatic,(void *)&err))) {
+            if((err = pthread_create(tids+i,NULL,executeStatic,(void *)threadParameter))) {
                 perror("pthread_create");
                 exit(1);
             }
@@ -198,17 +221,22 @@ void JobScheduler::wait_all_tasks_finish() { //waits all submitted tasks to fini
     }
 }
 
-
 Job * JobScheduler::obtain() {
     Job * data = NULL;
-    pthread_mutex_lock(&mtx);
+    pthread_mutex_lock(&queue_mtx);
     while (queue->count <= 0) {
-        pthread_cond_wait(&cond_nonempty, &mtx);
+        pthread_cond_wait(&cond_nonempty, &queue_mtx);
     }
     data = queue->data[queue->start];
     queue->start = (queue->start + 1) % POOL_SIZE;
     queue->count--;
     pthread_cond_broadcast(&cond_nonfull);
-    pthread_mutex_unlock(&mtx);
+    pthread_mutex_unlock(&queue_mtx);
     return data;
+}
+
+Parameter::Parameter(Head *newhead,MaxHeap *newheap,JobScheduler *newscheduler){
+    head = newhead;
+    heap = newheap;
+    scheduler = newscheduler;
 }
