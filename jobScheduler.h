@@ -7,7 +7,6 @@ extern pthread_mutex_t heap_mtx;
 extern pthread_cond_t cond_nonempty;
 extern pthread_cond_t cond_nonfull;
 
-
 class Job {
 public:
     int id;
@@ -38,7 +37,7 @@ public:
     JobScheduler(int execution_threads);
     ~JobScheduler();
     void submit_job(Job* j);
-    void execute_all_jobs(int type,Head *head,MaxHeap *heap,JobScheduler *scheduler);
+    void execute_all_jobs(int type);
     void wait_all_tasks_finish(); //waits all submitted tasks to finish
     Job * obtain();
 };
@@ -50,4 +49,7 @@ public:
     JobScheduler *scheduler;
 
     Parameter(Head *newhead,MaxHeap *newheap,JobScheduler *newscheduler);
+    ~Parameter();
 };
+
+extern Parameter *threadParameter;

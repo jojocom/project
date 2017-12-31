@@ -6,10 +6,10 @@
 #include <fcntl.h>
 #include <fstream>
 #include <stdint.h>
+#include <unistd.h>
 #include "list.h"
 #include "hash_functions.h"
 #include "jobScheduler.h"
-#include <unistd.h>
 #define STARTSIZE 10
 #define THREADSNUM 3
 
@@ -884,7 +884,7 @@ void recursiveCompress(TrieNode *current){
 
 void queryStaticRead(char *queryFileName,Head *head){
 
-    cout << 1 << endl;
+    // cout << "1" << endl;
 
     MaxHeap *heap = new MaxHeap(HeapCap);    // heap create
 
@@ -903,16 +903,15 @@ void queryStaticRead(char *queryFileName,Head *head){
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
-    // create threads
-    scheduler->execute_all_jobs(1,head,heap,scheduler);
+    threadParameter = new Parameter(head,heap,scheduler);
 
-    sleep(5);
+    // sleep(2);
 
     string line;
     ifstream queryFile( queryFileName );
     if (queryFile) {
         while (getline( queryFile, line )) {                // reading queries
-            cout << 2 << endl;
+            // cout << "2" << endl;
             char *cline = (char *) malloc(sizeof(char)*(line.length() + 1));
             strcpy(cline, line.c_str());
             int whitespace = 0;
@@ -960,13 +959,76 @@ void queryStaticRead(char *queryFileName,Head *head){
 
             counter++;
             if (strcmp(query[0],"F") == 0){
-                cout << 3 << endl;
-                for (int i = 0; i < counter; i++) {
+                // cout << "3" << endl;
+                // create threads
+                scheduler->execute_all_jobs(1);
+
+                for (int i = 0; i < counter-1; i++) {
                     // submit jobs
-                    cout << "3a" << endl;
-                    scheduler->submit_job(jobsArray[counter]);
-                    cout << "3b" << endl;
+                    // cout << "3a" << endl;
+                    // cout << "id: " << jobsArray[counter]->id << " queryLen: " << jobsArray[counter]->queryLen << endl;
+                    // for (int i = 0; i < jobsArray[counter]->queryLen; i++) {
+                    //     cout << jobsArray[counter]->query[i] << " ";
+                    // }
+                    // cout << endl;
+                    scheduler->submit_job(jobsArray[i]);
+                    // cout << "id: " << scheduler->queue->data[scheduler->queue->end]->id << " queryLen: " << scheduler->queue->data[scheduler->queue->end]->queryLen << endl;
+                    // for (int j = 0; j < scheduler->queue->data[scheduler->queue->end]->queryLen; j++) {
+                    //     cout << scheduler->queue->data[scheduler->queue->end]->query[j] << " ";
+                    // }
+                    // cout << endl;
+                    // cout << "3b" << endl;
                 }
+
+                // poisoning threads
+                char **poison = (char **) malloc(sizeof(char*));
+                poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
+                strcpy(poison[0],"poison");
+                // cout << poison[0] << endl;
+                // cout << 111 << endl;
+                Job *poisonJob = new Job(-1,1,poison);
+                for (int i = 0; i < THREADSNUM; i++) {
+                    // submit poison jobs
+                    scheduler->submit_job(poisonJob);
+                }
+
+                // wait threads
+                int err;
+                for (int i = 0; i < THREADSNUM; i++) {
+                    if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
+                        perror("pthread_join");
+                        exit(1);
+                    }
+                }
+
+                if(whitespace != 0){
+                    int k = atoi(query[1]);
+                    cout << "Top: ";
+                    for (int i = 0; i < k; i++) {
+                        pthread_mutex_lock(&heap_mtx);
+                        Element *el1 = heap->extractMax();
+                        pthread_mutex_unlock(&heap_mtx);
+                        if(el1 != NULL){
+                            if( i == k-1){
+                                cout << el1->word << endl;
+                            } else{
+                                cout << el1->word << "|";
+                            }
+                            if(heap->elements != 0){
+                                delete el1;
+                            }
+                        }
+                    }
+                }
+
+                delete heap;
+                heap = new MaxHeap(HeapCap);
+                threadParameter->heap = heap;
+
+                // delete poisonJob
+                delete poisonJob;
+                free(poison[0]);
+                free(poison);
 
                 // delete jobs array
                 for (int i = 0; i < counter; i++) {
@@ -990,37 +1052,6 @@ void queryStaticRead(char *queryFileName,Head *head){
         }
         queryFile.close();
 
-        // // poisoning threads
-        // char **poison = (char **) malloc(sizeof(char*));
-        // poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
-        // strcpy(poison[0],"poison");
-        // cout << poison[0] << endl;
-        // cout << 111 << endl;
-        // for (int i = 0; i < THREADSNUM; i++) {
-        //     jobsArray[i] = new Job(i,1,poison);
-        // }
-        // cout << 222 << endl;
-        // for (int i = 0; i < THREADSNUM; i++) {
-        //     // submit poison jobs
-        //     scheduler->submit_job(jobsArray[i]);
-        // }
-        //
-        // free(poison[0]);
-        // free(poison);
-
-        // // wait threads
-        // int err;
-        // for (int i = 0; i < THREADSNUM; i++) {
-        //     if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
-        //         perror("pthread_join");
-        //         exit(1);
-        //     }
-        // }
-
-        // delete array
-        // for (int i = 0; i < THREADSNUM; i++) {
-        //     delete jobsArray[i];
-        // }
         free(jobsArray);
     }
     pthread_cond_destroy(&cond_nonempty);
@@ -1028,8 +1059,7 @@ void queryStaticRead(char *queryFileName,Head *head){
     pthread_mutex_destroy(&heap_mtx);
     pthread_mutex_destroy(&queue_mtx);
 
-    // delete scheduler;
-    // delete heap;
+    delete threadParameter;
 }
 
 int searchNgramStatic(char **query,int queryNum,Head *head){
