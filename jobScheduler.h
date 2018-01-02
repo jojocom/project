@@ -1,9 +1,10 @@
 #include "heap.h"
 #include "trie.h"
-#define POOL_SIZE 20
+#define POOL_SIZE 30
 
 extern pthread_mutex_t queue_mtx;
 extern pthread_mutex_t heap_mtx;
+extern pthread_mutex_t printer_mtx;
 extern pthread_cond_t cond_nonempty;
 extern pthread_cond_t cond_nonfull;
 
@@ -47,6 +48,7 @@ public:
     Head *head;
     MaxHeap *heap;
     JobScheduler *scheduler;
+    char **printer;
 
     Parameter(Head *newhead,MaxHeap *newheap,JobScheduler *newscheduler);
     ~Parameter();

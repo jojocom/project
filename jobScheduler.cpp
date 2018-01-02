@@ -14,6 +14,7 @@
 
 pthread_mutex_t queue_mtx;
 pthread_mutex_t heap_mtx;
+pthread_mutex_t printer_mtx;
 pthread_cond_t cond_nonempty;
 pthread_cond_t cond_nonfull;
 Parameter *threadParameter;
@@ -73,18 +74,20 @@ void *executeDynamic(void *arg){
 }
 
 void *executeStatic(void *arg){
+    // pthread_mutex_lock(&printer_mtx);
     // cout << "thread" << endl;
     Head *head = threadParameter->head;
     MaxHeap *heap = threadParameter->heap;
     JobScheduler *scheduler = threadParameter->scheduler;
+    char **printer = threadParameter->printer;
 
     while(1){
         // obtain from scheduler's queue
         Job *job = scheduler->obtain();
-
         if (job == NULL) {
             cout << "null" << endl;
         }
+        int id = job->id;
         char **query = job->query;
         int whitespace = job->queryLen - 1;
         if(strcmp(query[0],"poison") == 0){
@@ -138,10 +141,16 @@ void *executeStatic(void *arg){
                             bitArray[((hash3+hash1)%(M*32))/32] = bitChanger(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32);
 
                             if(found == 0){
-                                cout << mykey;
+                                printer[id] = (char *) malloc(sizeof(char)*(strlen(mykey)+1));
+                                strcpy(printer[id],mykey);
+                                // cout << mykey;
                             } else{
-                                cout << "|";
-                                cout << mykey;
+                                int currentLen = strlen(printer[id]);
+                                printer[id] = (char *) realloc(printer[id], sizeof(char)*(currentLen+strlen(mykey)+2));
+                                strcat(printer[id],"|");
+                                strcat(printer[id],mykey);
+                                // cout << "|";
+                                // cout << mykey;
                             }
                             pthread_mutex_lock(&heap_mtx);
                             heap->insertKey(mykey);
@@ -154,39 +163,15 @@ void *executeStatic(void *arg){
                     }
                 }
             }
-            if(found == 0){
-                cout << "-1";               // if there are no Ngrams int the query
+            if(found == 0){     // if there are no Ngrams int the query
+                printer[id] = (char *) malloc(sizeof(char)*(3));
+                strcpy(printer[id],"-1");
+                // cout << "-1";
             }
-            cout << endl;
-        }
-        else if (strcmp(query[0],"F") == 0){
-            if(whitespace != 0){
-                int k = atoi(query[1]);
-                cout << "Top: ";
-                for (int i = 0; i < k; i++) {
-                    pthread_mutex_lock(&heap_mtx);
-                    Element *el1 = heap->extractMax();
-                    pthread_mutex_unlock(&heap_mtx);
-                    if(el1 != NULL){
-                        if( i == k-1){
-                            cout << el1->word << endl;
-                        } else{
-                            cout << el1->word << "|";
-                        }
-                        if(heap->elements != 0){
-                            delete el1;
-                        }
-                    }
-                }
-            }
-            // break;
-        }
-        else if (strcmp(query[0],"P") == 0){
-            // printAll(head->root,0);
+            // cout << endl;
         }
     }
-
-
+    // pthread_mutex_unlock(&printer_mtx);
     return NULL;
 }
 
@@ -232,7 +217,7 @@ Job * JobScheduler::obtain() {
     return data;
 }
 
-Parameter::Parameter(Head *newhead,MaxHeap *newheap,JobScheduler *newscheduler){
+Parameter::Parameter(Head *newhead,MaxHeap *newheap,JobScheduler *newscheduler):printer(NULL){
     head = newhead;
     heap = newheap;
     scheduler = newscheduler;

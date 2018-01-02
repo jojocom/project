@@ -11,7 +11,7 @@
 #include "hash_functions.h"
 #include "jobScheduler.h"
 #define STARTSIZE 10
-#define THREADSNUM 3
+#define THREADSNUM 8
 
 using namespace std;
 
@@ -900,6 +900,7 @@ void queryStaticRead(char *queryFileName,Head *head){
 
     pthread_mutex_init(&queue_mtx, 0);
     pthread_mutex_init(&heap_mtx, 0);
+    pthread_mutex_init(&printer_mtx, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
@@ -961,7 +962,11 @@ void queryStaticRead(char *queryFileName,Head *head){
             if (strcmp(query[0],"F") == 0){
                 // cout << "3" << endl;
                 // create threads
+                char **printer = (char **) malloc(sizeof(char *)*(counter-1));
+                threadParameter->printer = printer;
+
                 scheduler->execute_all_jobs(1);
+
 
                 for (int i = 0; i < counter-1; i++) {
                     // submit jobs
@@ -1000,6 +1005,16 @@ void queryStaticRead(char *queryFileName,Head *head){
                         exit(1);
                     }
                 }
+
+                for (int i = 0; i < counter-1; i++) {
+                    cout << printer[i] << endl;
+                }
+
+                for (int i = 0; i < counter-1; i++) {
+                    free(printer[i]);
+                }
+                free(printer);
+                threadParameter->printer = NULL;
 
                 if(whitespace != 0){
                     int k = atoi(query[1]);
@@ -1056,6 +1071,7 @@ void queryStaticRead(char *queryFileName,Head *head){
     }
     pthread_cond_destroy(&cond_nonempty);
     pthread_cond_destroy(&cond_nonfull);
+    pthread_mutex_destroy(&printer_mtx);
     pthread_mutex_destroy(&heap_mtx);
     pthread_mutex_destroy(&queue_mtx);
 
