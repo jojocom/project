@@ -24,7 +24,7 @@ RootNode::RootNode() : split(0) , size(HashSize), newsize(2*HashSize), currentSi
     for (int i = 0; i < HashSize; i++) {
         *hashtable[i] = (TrieNode *) malloc(sizeof(TrieNode)*BucketLen);
         for (int j = 0; j < BucketLen; j++) {
-            setNode(&(*hashtable[i])[j],N,false,NULL);
+            setNode(&(*hashtable[i])[j],N,false,NULL,0,-1);
         }
     }
     bucketSizes = (int *) malloc(sizeof(int)*HashSize);
@@ -72,13 +72,13 @@ RootNode::~RootNode(){
 }
 
 // constructor of trie nodes
-TrieNode::TrieNode(int capacity) : capacity(capacity), childNum(0), final(false),compressedNum(0){
+TrieNode::TrieNode(int capacity) : capacity(capacity), childNum(0), final(false),compressedNum(0),add(0),del(-1){
     word = NULL;
     compressedLengths = NULL;
     childs = (TrieNode **) malloc(sizeof(TrieNode *));
     *childs = (TrieNode *) malloc(sizeof(TrieNode)*capacity);
     for (int i = 0; i < capacity; i++) {
-        setNode(&(*childs)[i],N,false,NULL);
+        setNode(&(*childs)[i],N,false,NULL,0,-1);
     }
 }
 
@@ -108,7 +108,13 @@ TrieNode::~TrieNode(){
 }
 
 // set values of trie node members
-void setNode(TrieNode *current,int capacity,bool final,char *word){
+void setNode(TrieNode *current,int capacity,bool final,char *word,int add,int del){
+    if (add >= 0) {
+        current->add = add;
+    }
+    if (del >= -1) {
+        current->del = del;
+    }
     current->capacity = capacity;
     current->childNum = 0;
     current->final = final;
@@ -202,7 +208,7 @@ Head * trieCreate(char *fileName, int *compress){
 
                 temp = position + 1;
             }
-            insertNgram(query,whitespace+1,head);       // inserting Ngram to the trie
+            insertNgram(query,whitespace+1,head,0);       // inserting Ngram to the trie
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);
             }
@@ -216,7 +222,7 @@ Head * trieCreate(char *fileName, int *compress){
 }
 
 // inserting Ngram to the trie
-void insertNgram(char **query,int queryNum,Head *head){
+void insertNgram(char **query,int queryNum,Head *head,int counter){
     TrieNode *currentNode = NULL;
     int found = 0;
     int hash = hashcii(query[0]) % head->root->size;
@@ -246,17 +252,17 @@ void insertNgram(char **query,int queryNum,Head *head){
             *head->root->hashtable[hash] = (TrieNode *) realloc((*head->root->hashtable[hash]),sizeof(TrieNode)*2*(head->root->bucketSizes[hash]));
             head->root->bucketSizes[hash] = head->root->bucketSizes[hash]*2;
             for (int i = head->root->bucketSizes[hash]/2; i < head->root->bucketSizes[hash]; i++) {
-                setNode(&(*head->root->hashtable[hash])[i],N,false,NULL);
+                setNode(&(*head->root->hashtable[hash])[i],N,false,NULL,0,-1);
             }
             if(queryNum == 1){
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0]);
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0],counter,-2);
             } else{
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0]);
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0],counter,-2);
             }
             (*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode **) malloc(sizeof(TrieNode*));
             *(*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
             for (int j = 0; j < N; j++) {
-                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL);
+                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL,0,-1);
             }
             head->root->items[hash]++;
             if(hash != head->root->split){
@@ -271,7 +277,7 @@ void insertNgram(char **query,int queryNum,Head *head){
             head->root->hashtable[head->root->currentSize-1] = (TrieNode **) malloc(sizeof(TrieNode *));
             *head->root->hashtable[head->root->currentSize-1] = (TrieNode *) malloc(sizeof(TrieNode)*BucketLen);
             for (int e = 0; e < BucketLen; e++) {
-                setNode(&(*head->root->hashtable[head->root->currentSize-1])[e],N,false,NULL);
+                setNode(&(*head->root->hashtable[head->root->currentSize-1])[e],N,false,NULL,0,-1);
             }
             head->root->items = (int *) realloc(head->root->items,sizeof(int)*head->root->currentSize);
             head->root->items[head->root->currentSize-1] = 0;
@@ -286,7 +292,7 @@ void insertNgram(char **query,int queryNum,Head *head){
                         *head->root->hashtable[newhash] = (TrieNode *) realloc((*head->root->hashtable[newhash]),sizeof(TrieNode)*2*(head->root->bucketSizes[newhash]));
                         head->root->bucketSizes[newhash] = head->root->bucketSizes[newhash]*2;
                         for (int i = head->root->bucketSizes[newhash]/2; i < head->root->bucketSizes[newhash]; i++) {
-                            setNode(&(*head->root->hashtable[newhash])[i],N,false,NULL);
+                            setNode(&(*head->root->hashtable[newhash])[i],N,false,NULL,0,-1);
                         }
                     }
                     // move to new bucket
@@ -295,7 +301,7 @@ void insertNgram(char **query,int queryNum,Head *head){
                         // move other items 1 position left
                         memmove(&(*head->root->hashtable[head->root->split])[i],&(*head->root->hashtable[head->root->split])[i+1],sizeof(TrieNode)*(head->root->items[head->root->split]-i-1));
                     }
-                    setNode(&(*head->root->hashtable[head->root->split])[head->root->items[head->root->split]-1],N,false,NULL);
+                    setNode(&(*head->root->hashtable[head->root->split])[head->root->items[head->root->split]-1],N,false,NULL,0,-1);
                     head->root->items[newhash]++;
                     head->root->items[head->root->split]--;
                     i--;
@@ -316,14 +322,14 @@ void insertNgram(char **query,int queryNum,Head *head){
             }
         } else{
             if(queryNum == 1){
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0]);
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0],counter,-2);
             } else{
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0]);
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0],counter,-2);
             }
             (*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode **) malloc(sizeof(TrieNode*));
             *(*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
             for (int j = 0; j < N; j++) {
-                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL);
+                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL,0,-1);
             }
             head->root->items[hash]++;
             int cell = head->root->items[hash] - 1;
@@ -365,22 +371,201 @@ void insertNgram(char **query,int queryNum,Head *head){
                 *currentNode->childs = (TrieNode *) realloc(*currentNode->childs,sizeof(TrieNode)*currentNode->capacity*2);
                 currentNode->capacity = currentNode->capacity*2;
                 for (int j = currentNode->childNum; j < currentNode->capacity; j++) {
-                    setNode(&(*currentNode->childs)[j],N,false,NULL);
+                    setNode(&(*currentNode->childs)[j],N,false,NULL,0,-1);
                 }
             }
             if(i == queryNum - 1){                  // creating node for last word of Ngram
-                setNode(&(*currentNode->childs)[currentNode->childNum],N,true,query[i]);
+                setNode(&(*currentNode->childs)[currentNode->childNum],N,true,query[i],counter,-2);
                 (*currentNode->childs)[currentNode->childNum].childs = (TrieNode **) malloc(sizeof(TrieNode*));
                 *(*currentNode->childs)[currentNode->childNum].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
                 for (int j = 0; j < N; j++) {
-                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL);
+                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL,0,-1);
                 }
             } else {                        // creating node for not last word of Ngram
-                setNode(&(*currentNode->childs)[currentNode->childNum],N,false,query[i]);
+                setNode(&(*currentNode->childs)[currentNode->childNum],N,false,query[i],counter,-2);
                 (*currentNode->childs)[currentNode->childNum].childs = (TrieNode **) malloc(sizeof(TrieNode*));
                 *(*currentNode->childs)[currentNode->childNum].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
                 for (int j = 0; j < N; j++) {
-                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL);
+                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL,0,-1);
+                }
+            }
+            currentNode->childNum++;
+
+            int cell = currentNode->childNum - 1;
+            if(currentNode->childNum > 1){
+                cell = sortChilds(currentNode);             // binary insertion sort of the array of childs
+            }
+            currentNode = &(*currentNode->childs)[cell];
+        }
+    }
+}
+
+// inserting Ngram to the trie
+void noInsertNgram(char **query,int queryNum,Head *head,int counter){
+    TrieNode *currentNode = NULL;
+    int found = 0;
+    int hash = hashcii(query[0]) % head->root->size;
+    if(hash < head->root->split){
+        hash = hashcii(query[0]) % head->root->newsize;
+    }
+    int left = 0;
+    int right = head->root->items[hash] - 1;
+    while(left <= right){                       // checking if 1st word of Ngram exists and where
+        int mid = left + ((right - left)/2);
+        if(head->root->hashtable[hash] != NULL){
+            if((*head->root->hashtable[hash])[mid].word != NULL){
+                if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
+                    found = 1;
+                    currentNode = &(*head->root->hashtable[hash])[mid];
+                    break;
+                } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) < 0){
+                    right = mid - 1;
+                } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) > 0){
+                    left = mid + 1;
+                }
+            }
+        }
+    }
+    if(found == 0){
+        if(head->root->bucketSizes[hash] == head->root->items[hash]){
+            *head->root->hashtable[hash] = (TrieNode *) realloc((*head->root->hashtable[hash]),sizeof(TrieNode)*2*(head->root->bucketSizes[hash]));
+            head->root->bucketSizes[hash] = head->root->bucketSizes[hash]*2;
+            for (int i = head->root->bucketSizes[hash]/2; i < head->root->bucketSizes[hash]; i++) {
+                setNode(&(*head->root->hashtable[hash])[i],N,false,NULL,0,-1);
+            }
+            if(queryNum == 1){
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0],counter,-2);
+            } else{
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0],counter,-2);
+            }
+            (*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode **) malloc(sizeof(TrieNode*));
+            *(*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
+            for (int j = 0; j < N; j++) {
+                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL,0,-1);
+            }
+            head->root->items[hash]++;
+            if(hash != head->root->split){
+                int cell = head->root->items[hash] - 1;
+                if(head->root->items[hash] > 1){
+                    cell = sortCell(head->root,hash);
+                }
+                currentNode = &(*head->root->hashtable[hash])[cell];
+            }
+            head->root->hashtable = (TrieNode ***) realloc(head->root->hashtable,sizeof(TrieNode **)*(head->root->currentSize+1));
+            head->root->currentSize++;
+            head->root->hashtable[head->root->currentSize-1] = (TrieNode **) malloc(sizeof(TrieNode *));
+            *head->root->hashtable[head->root->currentSize-1] = (TrieNode *) malloc(sizeof(TrieNode)*BucketLen);
+            for (int e = 0; e < BucketLen; e++) {
+                setNode(&(*head->root->hashtable[head->root->currentSize-1])[e],N,false,NULL,0,-1);
+            }
+            head->root->items = (int *) realloc(head->root->items,sizeof(int)*head->root->currentSize);
+            head->root->items[head->root->currentSize-1] = 0;
+            head->root->bucketSizes = (int *) realloc(head->root->bucketSizes,sizeof(int)*head->root->currentSize);
+            head->root->bucketSizes[head->root->currentSize-1] = BucketLen;
+            // split bucket
+            for (int i = 0; i < head->root->items[head->root->split]; i++) {
+                int newhash = 0;
+                newhash = hashcii((*head->root->hashtable[head->root->split])[i].word) % head->root->newsize;
+                if(newhash != head->root->split){
+                    if(head->root->bucketSizes[newhash] == head->root->items[newhash]){
+                        *head->root->hashtable[newhash] = (TrieNode *) realloc((*head->root->hashtable[newhash]),sizeof(TrieNode)*2*(head->root->bucketSizes[newhash]));
+                        head->root->bucketSizes[newhash] = head->root->bucketSizes[newhash]*2;
+                        for (int i = head->root->bucketSizes[newhash]/2; i < head->root->bucketSizes[newhash]; i++) {
+                            setNode(&(*head->root->hashtable[newhash])[i],N,false,NULL,0,-1);
+                        }
+                    }
+                    // move to new bucket
+                    memmove(&(*head->root->hashtable[newhash])[head->root->items[newhash]],&(*head->root->hashtable[head->root->split])[i],sizeof(TrieNode));
+                    if((head->root->items[head->root->split]-i-1) != 0){
+                        // move other items 1 position left
+                        memmove(&(*head->root->hashtable[head->root->split])[i],&(*head->root->hashtable[head->root->split])[i+1],sizeof(TrieNode)*(head->root->items[head->root->split]-i-1));
+                    }
+                    setNode(&(*head->root->hashtable[head->root->split])[head->root->items[head->root->split]-1],N,false,NULL,0,-1);
+                    head->root->items[newhash]++;
+                    head->root->items[head->root->split]--;
+                    i--;
+                }
+                if((i == head->root->items[head->root->split]-1) && (head->root->split == hash)){
+                    int cell = head->root->items[newhash] - 1;
+                    if(head->root->items[newhash] > 1){
+                        cell = sortCell(head->root,newhash);
+                    }
+                    currentNode = &(*head->root->hashtable[newhash])[cell];
+                }
+            }
+            head->root->split++;
+            if(head->root->split == head->root->size){
+                head->root->split = 0;
+                head->root->size = head->root->newsize;
+                head->root->newsize = 2*head->root->newsize;
+            }
+        } else{
+            if(queryNum == 1){
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0],counter,-2);
+            } else{
+                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0],counter,-2);
+            }
+            (*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode **) malloc(sizeof(TrieNode*));
+            *(*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
+            for (int j = 0; j < N; j++) {
+                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL,0,-1);
+            }
+            head->root->items[hash]++;
+            int cell = head->root->items[hash] - 1;
+            if(head->root->items[hash] > 1){
+                cell = sortCell(head->root,hash);
+            }
+            currentNode = &(*head->root->hashtable[hash])[cell];
+        }
+    } else{
+        if(queryNum == 1){
+            currentNode->final = true;
+        }
+    }
+    for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
+        found = 0;
+        left = 0;
+        right = currentNode->childNum - 1;
+        while(left <= right){                       // checking if i-th word of Ngram exists and where
+            int mid = left + ((right - left)/2);
+            if(currentNode->childs != NULL){
+                if((*currentNode->childs)[mid].word != NULL){
+                    if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
+                        found = 1;
+                        currentNode = &(*currentNode->childs)[mid];
+                        if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                            currentNode->final = true;
+                        }
+                        break;
+                    } else if(strcmp(query[i],(*currentNode->childs)[mid].word) < 0){
+                        right = mid - 1;
+                    } else if(strcmp(query[i],(*currentNode->childs)[mid].word) > 0){
+                        left = mid + 1;
+                    }
+                }
+            }
+        }
+        if(found == 0){                     // if i-th word of Ngram does not exist
+            if(currentNode->childNum == currentNode->capacity){             // if array of childs need expansion
+                *currentNode->childs = (TrieNode *) realloc(*currentNode->childs,sizeof(TrieNode)*currentNode->capacity*2);
+                currentNode->capacity = currentNode->capacity*2;
+                for (int j = currentNode->childNum; j < currentNode->capacity; j++) {
+                    setNode(&(*currentNode->childs)[j],N,false,NULL,0,-1);
+                }
+            }
+            if(i == queryNum - 1){                  // creating node for last word of Ngram
+                setNode(&(*currentNode->childs)[currentNode->childNum],N,true,query[i],counter,-2);
+                (*currentNode->childs)[currentNode->childNum].childs = (TrieNode **) malloc(sizeof(TrieNode*));
+                *(*currentNode->childs)[currentNode->childNum].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
+                for (int j = 0; j < N; j++) {
+                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL,0,-1);
+                }
+            } else {                        // creating node for not last word of Ngram
+                setNode(&(*currentNode->childs)[currentNode->childNum],N,false,query[i],counter,-2);
+                (*currentNode->childs)[currentNode->childNum].childs = (TrieNode **) malloc(sizeof(TrieNode*));
+                *(*currentNode->childs)[currentNode->childNum].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
+                for (int j = 0; j < N; j++) {
+                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL,0,-1);
                 }
             }
             currentNode->childNum++;
@@ -467,7 +652,7 @@ int searchNgram(char **query,int queryNum,Head *head){
 }
 
 // deleting Ngram from the trie
-void deleteNgram(char **query,int queryNum,Head *head){
+void deleteNgram(char **query,int queryNum,Head *head,int counter){
 
     TrieNode **path = new TrieNode*[queryNum+1];
     TrieNode *currentNode = NULL;
@@ -502,7 +687,7 @@ void deleteNgram(char **query,int queryNum,Head *head){
                 free(currentNode->word);
             }
             memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
-            setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL);
+            setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
             head->root->items[hash]--;
         } else{
             path[0] = currentNode;
@@ -559,7 +744,7 @@ void deleteNgram(char **query,int queryNum,Head *head){
                         }
                         path[i-2]->childNum--;
                         memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
-                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL);
+                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
                     }
                 } else if(i == 1){                      // if node of not last word of Ngram
                     if((path[i-1]->childNum == 0) && (path[i-1]->final == false)){
@@ -568,7 +753,7 @@ void deleteNgram(char **query,int queryNum,Head *head){
                             free((*head->root->hashtable[hash])[mid].word);
                         }
                         memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
-                        setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL);
+                        setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
                         head->root->items[hash]--;
                     } else break;
                 } else{                      // if node of not last word of Ngram
@@ -586,7 +771,140 @@ void deleteNgram(char **query,int queryNum,Head *head){
                         }
                         path[i-2]->childNum--;
                         memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
-                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL);
+                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
+                    } else break;
+                }
+            }
+        }
+    }
+    for (int j = 0; j < queryNum; j++) {
+        path[j] = NULL;
+    }
+    delete [] path;
+    return ;
+}
+
+// deleting Ngram from the trie
+void noDeleteNgram(char **query,int queryNum,Head *head,int counter){
+
+    TrieNode **path = new TrieNode*[queryNum+1];
+    TrieNode *currentNode = NULL;
+    int found = 0;
+    int hash = hashcii(query[0]) % head->root->size;
+    if(hash < head->root->split){
+        hash = hashcii(query[0]) % head->root->newsize;
+    }
+    int mid = 0;
+    int left = 0;
+    int right = head->root->items[hash] - 1;
+    while(left <= right){                       // checking if 1st word of Ngram exists and where
+        mid = left + ((right - left)/2);
+        if(head->root->hashtable[hash] != NULL){
+            if((*head->root->hashtable[hash])[mid].word != NULL){
+                if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
+                    found = 1;
+                    currentNode = &(*head->root->hashtable[hash])[mid];
+                    break;
+                } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) < 0){
+                    right = mid - 1;
+                } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) > 0){
+                    left = mid + 1;
+                }
+            }
+        }
+    }
+    if(found == 1){
+        if((currentNode->childNum == 0) && (queryNum == 1)){
+            free_trie(currentNode);             //delete node
+            if(currentNode->word != NULL){
+                free(currentNode->word);
+            }
+            memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
+            setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
+            head->root->items[hash]--;
+        } else{
+            path[0] = currentNode;
+            for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
+                found = 0;
+                int left = 0;
+                int right = currentNode->childNum - 1;
+                while(left <= right){                       // checking if i-th word of Ngram exists and where
+                    int mid = left + ((right - left)/2);
+                    if(currentNode->childs != NULL){
+                        if((*currentNode->childs)[mid].word != NULL){
+                            if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
+                                found = 1;
+                                currentNode = &(*currentNode->childs)[mid];
+                                path[i] = currentNode;
+                                if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                    if(currentNode->final == false){
+                                        found = 0;
+                                    }
+                                }
+                                break;
+                            } else if(strcmp(query[i],(*currentNode->childs)[mid].word) < 0){
+                                right = mid - 1;
+                            } else if(strcmp(query[i],(*currentNode->childs)[mid].word) > 0){
+                                left = mid + 1;
+                            }
+                        }
+                    }
+                }
+                if(found == 0){                     // if i-th word of Ngram does not exist
+                    for (int j = 0; j < queryNum; j++) {
+                        path[j] = NULL;
+                    }
+                    delete [] path;
+                    return ;
+                }
+            }
+            for (int i = queryNum; i > 0; i--) {                // deleting node of i-th word of Ngram
+                if(i == queryNum){                      // if node of last word of Ngram
+                    if(path[i-1]->childNum != 0){           // if node has childs
+                        path[i-1]->final = false;
+                        break;
+                    } else{
+                        int cell = 0;
+                        for (int j = 0; j < path[i-2]->childNum; j++) {         // find position of node in parent's array of childs
+                            if(strcmp((*path[i-2]->childs)[j].word,path[i-1]->word) == 0){
+                                cell = j;
+                                break;
+                            }
+                        }
+                        free_trie(&(*path[i-2]->childs)[cell]);             //delete node
+                        if((*path[i-2]->childs)[cell].word != NULL){
+                            free((*path[i-2]->childs)[cell].word);
+                        }
+                        path[i-2]->childNum--;
+                        memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
+                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
+                    }
+                } else if(i == 1){                      // if node of not last word of Ngram
+                    if((path[i-1]->childNum == 0) && (path[i-1]->final == false)){
+                        free_trie(&(*head->root->hashtable[hash])[mid]);             //delete node
+                        if((*head->root->hashtable[hash])[mid].word != NULL){
+                            free((*head->root->hashtable[hash])[mid].word);
+                        }
+                        memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
+                        setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
+                        head->root->items[hash]--;
+                    } else break;
+                } else{                      // if node of not last word of Ngram
+                    if((path[i-1]->childNum == 0) && (path[i-1]->final == false) && (path[i-1]->word != NULL)){           // if node has not childs,is not final and is not head->root
+                        int cell = 0;
+                        for (int j = 0; j < path[i-2]->childNum; j++) {         // find position of node in parent's array of childs
+                            if(strcmp((*path[i-2]->childs)[j].word,path[i-1]->word) == 0){
+                                cell = j;
+                                break;
+                            }
+                        }
+                        free_trie(&(*path[i-2]->childs)[cell]);             //delete node
+                        if((*path[i-2]->childs)[cell].word != NULL){
+                            free((*path[i-2]->childs)[cell].word);
+                        }
+                        path[i-2]->childNum--;
+                        memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
+                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
                     } else break;
                 }
             }
@@ -601,13 +919,29 @@ void deleteNgram(char **query,int queryNum,Head *head){
 
 // reading queries and do Q,A or D
 void queryRead(char *queryFileName,Head *head){
-
+    // std::cout << "queryRead" << '\n';
     MaxHeap *heap = new MaxHeap(HeapCap);    // heap create
-
+    int counter = 0;
+    // int addcounter = 0;
+    // int delcounter = 0;
+    int currentSize = STARTSIZE;
+    Job **jobsArray = (Job **) malloc(sizeof(Job *)*STARTSIZE);
+    for (int i = 0; i < STARTSIZE; i++) {
+        jobsArray[i] = NULL;
+    }
+    JobScheduler *scheduler = new JobScheduler(THREADSNUM);
+    pthread_mutex_init(&head_mtx, 0);
+    pthread_mutex_init(&queue_mtx, 0);
+    pthread_mutex_init(&heap_mtx, 0);
+    pthread_mutex_init(&printer_mtx, 0);
+    pthread_cond_init(&cond_nonempty, 0);
+    pthread_cond_init(&cond_nonfull, 0);
+    threadParameter = new Parameter(head,heap,scheduler);
     string line;
     ifstream queryFile( queryFileName );
     if (queryFile) {
         while (getline( queryFile, line )) {                // reading queries
+            // std::cout << "while" << '\n';
             char *cline = (char *) malloc(sizeof(char)*(line.length() + 1));
             strcpy(cline, line.c_str());
             int whitespace = 0;
@@ -639,103 +973,130 @@ void queryRead(char *queryFileName,Head *head){
                 temp = position + 1;
             }
             char **queryStart = query + 1;
-            uint32_t bitArray[M];
-            for (int i = 0; i < M; i++) {
-                bitArray[i] = 0;
+            if(counter == currentSize){
+                jobsArray = (Job **) realloc(jobsArray,sizeof(Job *)*currentSize*2);
+                for (int i = currentSize; i < 2*currentSize; i++) {
+                    jobsArray[i] = NULL;
+                }
+                currentSize = 2*currentSize;
             }
-            if(strcmp(query[0],"Q") == 0){              // for Q query
-                int found = 0;
-                for (int k = 0; k < whitespace; k++) {
-                    char **temp = queryStart + k;
-                    for (int j = 1; j <= whitespace-k; j++) {
-                        int x = searchNgram(temp,j,head);
-                        if(x == 1){
-                            int length = 0;
-                            for (int d = 0; d < j; d++) {
-                                length += strlen(temp[d]);
-                            }
-                            char *mykey;
-                            mykey = (char *) malloc(sizeof(char)*(length + j));
-                            for (int d = 0; d < j; d++) {
-                                if(d == 0){
-                                    strcpy(mykey,temp[d]);
-                                }
-                                else{
-                                    strcat(mykey,temp[d]);
-                                }
-                                if(d != j-1){
-                                    strcat(mykey," ");
-                                    // this is hell
-                                }
-                            }
-                            int hash1 = murmurhash(mykey,(uint32_t) strlen(mykey),0) % (M*32);
-                            int hash2 = hash_pearson(mykey) % (M*32);
-                            int hash3 = hash_jenkins(mykey) % (M*32);
-
-                            if((bitChecker(bitArray[hash1/32],hash1%32) == 0) || (bitChecker(bitArray[hash2/32],hash2%32) == 0) || (bitChecker(bitArray[hash3/32],hash3%32) == 0) || (bitChecker(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32) == 0) || (bitChecker(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32) == 0)){
-                                bitArray[hash1/32] = bitChanger(bitArray[hash1/32],hash1%32);
-                                bitArray[hash2/32] = bitChanger(bitArray[hash2/32],hash2%32);
-                                bitArray[hash3/32] = bitChanger(bitArray[hash3/32],hash3%32);
-                                bitArray[((hash2+hash1)%(M*32))/32] = bitChanger(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32);
-                                bitArray[((hash3+hash1)%(M*32))/32] = bitChanger(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32);
-
-                                if(found == 0){
-                                    cout << mykey;
-                                } else{
-                                    cout << "|";
-                                    cout << mykey;
-                                }
-                                heap->insertKey(mykey);
-                            }
-                            free(mykey);
-                            found = 1;
-                        } else if(x == 0){
-                            break;
+            counter++;
+            if (strcmp(query[0],"Q") == 0 ){
+                // std::cout << "Q" << '\n';
+                jobsArray[counter] = new Job(counter,whitespace+1,query);
+            } else if (strcmp(query[0],"A") == 0 ){
+                // addcounter++;
+                // std::cout << "A" << '\n';
+                insertNgram(queryStart,whitespace,head,counter);
+                jobsArray[counter] = new Job(-1,whitespace+1,query);
+            } else if (strcmp(query[0],"D") == 0) {
+                // delcounter++;
+                // std::cout << "D" << '\n';
+                noDeleteNgram(queryStart,whitespace,head,counter);
+                jobsArray[counter] = new Job(-2,whitespace+1,query);
+            } else if (strcmp(query[0],"F") == 0){
+                // std::cout << "F" << '\n';
+                char **printer = (char **) malloc(sizeof(char *)*(counter));
+                // std::cout << "111" << '\n';
+                threadParameter->printer = printer;
+                // std::cout << "before create" << '\n';
+                scheduler->execute_all_jobs(0);
+                // std::cout << "after create" << '\n';
+                // std::cout << "counter: " << counter << '\n';
+                for (int i = 0; i < counter; i++) {
+                    // std::cout << "i: " << i << '\n';
+                    if (jobsArray[i] != NULL) {
+                        if (jobsArray[i]->id >= 0) {
+                            scheduler->submit_job(jobsArray[i]);
                         }
                     }
                 }
-                if(found == 0){
-                    cout << "-1";               // if there are no Ngrams int the query
+                // std::cout << "after submit" << '\n';
+                // poisoning threads
+                char **poison = (char **) malloc(sizeof(char*));
+                poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
+                strcpy(poison[0],"poison");
+                Job *poisonJob = new Job(-1,1,poison);
+                for (int i = 0; i < THREADSNUM; i++) {
+                    scheduler->submit_job(poisonJob);
                 }
-                cout << endl;
-            }
-            else if (strcmp(query[0],"A") == 0){              // for A query
-                insertNgram(queryStart,whitespace,head);
-            }
-            else if (strcmp(query[0],"D") == 0){              // for D query
-                deleteNgram(queryStart,whitespace,head);
-            }
-            else if (strcmp(query[0],"F") == 0){
+                // wait threads
+                int err;
+                // // std::cout << "before join" << '\n';
+                for (int i = 0; i < THREADSNUM; i++) {
+                    if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
+                        perror("pthread_join");
+                        exit(1);
+                    }
+                }
+                // std::cout << "after join" << '\n';
+                for (int i = 0; i < counter; i++) {
+                    if (printer[i] != NULL) {
+                        cout << printer[i] << endl;
+                    }
+                }
+                for (int i = 0; i < counter; i++) {
+                    if (printer[i] != NULL) {
+                        free(printer[i]);
+                    }
+                }
+                free(printer);
+                threadParameter->printer = NULL;
                 if(whitespace != 0){
                     int k = atoi(query[1]);
-                    if(heap->elements != 0){
-                        cout << "Top: ";
-                        for (int i = 0; i < k; i++) {
-                            Element *el1 = heap->extractMax();
-                            if(el1 != NULL){
-                                if( i == k-1){
-                                    cout << el1->word;
-                                } else{
-                                    cout << el1->word << "|";
-                                }
-                                if(heap->elements != 0){
-                                    delete el1;
-                                }
+                    cout << "Top: ";
+                    for (int i = 0; i < k; i++) {
+                        pthread_mutex_lock(&heap_mtx);
+                        Element *el1 = heap->extractMax();
+                        pthread_mutex_unlock(&heap_mtx);
+                        if(el1 != NULL){
+                            if( i == k-1){
+                                cout << el1->word << endl;
+                            } else{
+                                cout << el1->word << "|";
+                            }
+                            if(heap->elements != 0){
+                                delete el1;
                             }
                         }
-                        cout << endl;
                     }
-                    delete heap;
-                    heap = new MaxHeap(HeapCap);
-                } else{
-                    delete heap;
-                    heap = new MaxHeap(HeapCap);
                 }
-            }
-            else if (strcmp(query[0],"P") == 0){
-                // printAll(head->root,0);
-            }
 
+                // noInsertNgram
+                for (int i = 0; i < counter; i++) {
+                    if (jobsArray[i] != NULL && jobsArray[i]->id == -1) {
+                        noInsertNgram(queryStart,whitespace,head,counter);
+                    }
+                }
+                // deleteNgram
+                for (int i = 0; i < counter; i++) {
+                    if (jobsArray[i] != NULL && jobsArray[i]->id == -2) {
+                        deleteNgram(queryStart,whitespace,head,counter);
+                    }
+                }
+
+                delete heap;
+                heap = new MaxHeap(HeapCap);
+                threadParameter->heap = heap;
+                // delete poisonJob
+                delete poisonJob;
+                free(poison[0]);
+                free(poison);
+                // delete jobs array
+                for (int i = 0; i < counter; i++) {
+                    delete jobsArray[i];
+                }
+                free(jobsArray);
+                // create new array
+                jobsArray = (Job **) malloc(sizeof(Job *)*STARTSIZE);
+                for (int i = 0; i < STARTSIZE; i++) {
+                    jobsArray[i] = NULL;
+                }
+                currentSize = STARTSIZE;
+                counter = 0;
+                // addcounter = 0;
+                // delcounter = 0;
+            }
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);
             }
@@ -743,8 +1104,15 @@ void queryRead(char *queryFileName,Head *head){
             free(cline);
         }
         queryFile.close();
+        free(jobsArray);
     }
-    delete heap;
+    pthread_cond_destroy(&cond_nonempty);
+    pthread_cond_destroy(&cond_nonfull);
+    pthread_mutex_destroy(&printer_mtx);
+    pthread_mutex_destroy(&heap_mtx);
+    pthread_mutex_destroy(&queue_mtx);
+    pthread_mutex_destroy(&head_mtx);
+    delete threadParameter;
 }
 
 void print(RootNode *root){
@@ -883,36 +1251,24 @@ void recursiveCompress(TrieNode *current){
 }
 
 void queryStaticRead(char *queryFileName,Head *head){
-
-    // cout << "1" << endl;
-
     MaxHeap *heap = new MaxHeap(HeapCap);    // heap create
-
     int counter = 0;
     int currentSize = STARTSIZE;
-
     Job **jobsArray = (Job **) malloc(sizeof(Job *)*STARTSIZE);
     for (int i = 0; i < STARTSIZE; i++) {
         jobsArray[i] = NULL;
     }
-
     JobScheduler *scheduler = new JobScheduler(THREADSNUM);
-
     pthread_mutex_init(&queue_mtx, 0);
     pthread_mutex_init(&heap_mtx, 0);
     pthread_mutex_init(&printer_mtx, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
-
     threadParameter = new Parameter(head,heap,scheduler);
-
-    // sleep(2);
-
     string line;
     ifstream queryFile( queryFileName );
     if (queryFile) {
         while (getline( queryFile, line )) {                // reading queries
-            // cout << "2" << endl;
             char *cline = (char *) malloc(sizeof(char)*(line.length() + 1));
             strcpy(cline, line.c_str());
             int whitespace = 0;
@@ -943,7 +1299,6 @@ void queryStaticRead(char *queryFileName,Head *head){
                 sscanf(temp,"%s",query[i]);
                 temp = position + 1;
             }
-
             if(counter == currentSize){
                 jobsArray = (Job **) realloc(jobsArray,sizeof(Job *)*currentSize*2);
                 for (int i = currentSize; i < 2*currentSize; i++) {
@@ -952,51 +1307,22 @@ void queryStaticRead(char *queryFileName,Head *head){
                 currentSize = 2*currentSize;
             }
             jobsArray[counter] = new Job(counter,whitespace+1,query);
-            // cout << "id: " << jobsArray[counter]->id << " queryLen: " << jobsArray[counter]->queryLen << endl;
-            // for (int i = 0; i < jobsArray[counter]->queryLen; i++) {
-            //     cout << jobsArray[counter]->query[i] << " ";
-            // }
-            // cout << endl;
-
             counter++;
             if (strcmp(query[0],"F") == 0){
-                // cout << "3" << endl;
-                // create threads
                 char **printer = (char **) malloc(sizeof(char *)*(counter-1));
                 threadParameter->printer = printer;
-
                 scheduler->execute_all_jobs(1);
-
-
                 for (int i = 0; i < counter-1; i++) {
-                    // submit jobs
-                    // cout << "3a" << endl;
-                    // cout << "id: " << jobsArray[counter]->id << " queryLen: " << jobsArray[counter]->queryLen << endl;
-                    // for (int i = 0; i < jobsArray[counter]->queryLen; i++) {
-                    //     cout << jobsArray[counter]->query[i] << " ";
-                    // }
-                    // cout << endl;
                     scheduler->submit_job(jobsArray[i]);
-                    // cout << "id: " << scheduler->queue->data[scheduler->queue->end]->id << " queryLen: " << scheduler->queue->data[scheduler->queue->end]->queryLen << endl;
-                    // for (int j = 0; j < scheduler->queue->data[scheduler->queue->end]->queryLen; j++) {
-                    //     cout << scheduler->queue->data[scheduler->queue->end]->query[j] << " ";
-                    // }
-                    // cout << endl;
-                    // cout << "3b" << endl;
                 }
-
                 // poisoning threads
                 char **poison = (char **) malloc(sizeof(char*));
                 poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
                 strcpy(poison[0],"poison");
-                // cout << poison[0] << endl;
-                // cout << 111 << endl;
                 Job *poisonJob = new Job(-1,1,poison);
                 for (int i = 0; i < THREADSNUM; i++) {
-                    // submit poison jobs
                     scheduler->submit_job(poisonJob);
                 }
-
                 // wait threads
                 int err;
                 for (int i = 0; i < THREADSNUM; i++) {
@@ -1005,17 +1331,14 @@ void queryStaticRead(char *queryFileName,Head *head){
                         exit(1);
                     }
                 }
-
                 for (int i = 0; i < counter-1; i++) {
                     cout << printer[i] << endl;
                 }
-
                 for (int i = 0; i < counter-1; i++) {
                     free(printer[i]);
                 }
                 free(printer);
                 threadParameter->printer = NULL;
-
                 if(whitespace != 0){
                     int k = atoi(query[1]);
                     cout << "Top: ";
@@ -1035,16 +1358,13 @@ void queryStaticRead(char *queryFileName,Head *head){
                         }
                     }
                 }
-
                 delete heap;
                 heap = new MaxHeap(HeapCap);
                 threadParameter->heap = heap;
-
                 // delete poisonJob
                 delete poisonJob;
                 free(poison[0]);
                 free(poison);
-
                 // delete jobs array
                 for (int i = 0; i < counter; i++) {
                     delete jobsArray[i];
@@ -1058,7 +1378,6 @@ void queryStaticRead(char *queryFileName,Head *head){
                 currentSize = STARTSIZE;
                 counter = 0;
             }
-
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);
             }
@@ -1066,7 +1385,6 @@ void queryStaticRead(char *queryFileName,Head *head){
             free(cline);
         }
         queryFile.close();
-
         free(jobsArray);
     }
     pthread_cond_destroy(&cond_nonempty);
@@ -1074,7 +1392,6 @@ void queryStaticRead(char *queryFileName,Head *head){
     pthread_mutex_destroy(&printer_mtx);
     pthread_mutex_destroy(&heap_mtx);
     pthread_mutex_destroy(&queue_mtx);
-
     delete threadParameter;
 }
 

@@ -2,6 +2,7 @@
 #include "trie.h"
 #define POOL_SIZE 30
 
+extern pthread_mutex_t head_mtx;
 extern pthread_mutex_t queue_mtx;
 extern pthread_mutex_t heap_mtx;
 extern pthread_mutex_t printer_mtx;

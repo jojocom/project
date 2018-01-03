@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {                                              
 
     if(compress == 0){
         // reading queries
+        // std::cout << "main" << '\n';
         queryRead(queryFileName,head);
     } else{
         trieCompress(head);

@@ -12,6 +12,7 @@
 #include "hash_functions.h"
 #include "jobScheduler.h"
 
+pthread_mutex_t head_mtx;
 pthread_mutex_t queue_mtx;
 pthread_mutex_t heap_mtx;
 pthread_mutex_t printer_mtx;
@@ -50,8 +51,6 @@ JobScheduler::JobScheduler( int newexecution_threads):execution_threads(newexecu
     }
 }
 
-// JobScheduler::JobScheduler()
-
 JobScheduler::~JobScheduler(){
     delete queue;
     free(tids);
@@ -70,20 +69,14 @@ void JobScheduler::submit_job(Job* data) {
 }
 
 void *executeDynamic(void *arg){
-    return NULL;
-}
-
-void *executeStatic(void *arg){
-    // pthread_mutex_lock(&printer_mtx);
-    // cout << "thread" << endl;
+    // std::cout << "thread" << '\n';
     Head *head = threadParameter->head;
     MaxHeap *heap = threadParameter->heap;
     JobScheduler *scheduler = threadParameter->scheduler;
     char **printer = threadParameter->printer;
 
     while(1){
-        // obtain from scheduler's queue
-        Job *job = scheduler->obtain();
+        Job *job = scheduler->obtain();     // obtain from scheduler's queue
         if (job == NULL) {
             cout << "null" << endl;
         }
@@ -93,11 +86,95 @@ void *executeStatic(void *arg){
         if(strcmp(query[0],"poison") == 0){
             break;
         }
-        // cout << "id: " << job->id << " queryLen: " << job->queryLen << endl;
-        // for (int i = 0; i < job->queryLen; i++) {
-        //     cout << job->query[i] << " ";
-        // }
-        // cout << endl;
+
+        uint32_t bitArray[M];
+        for (int i = 0; i < M; i++) {
+            bitArray[i] = 0;
+        }
+        char **queryStart = query + 1;
+
+        if(strcmp(query[0],"Q") == 0){              // for Q query
+            int found = 0;
+            for (int k = 0; k < whitespace; k++) {
+                char **temp = queryStart + k;
+                for (int j = 1; j <= whitespace-k; j++) {
+                    int x = searchNgram(temp,j,head);
+                    if(x == 1){
+                        int length = 0;
+                        for (int d = 0; d < j; d++) {
+                            length += strlen(temp[d]);
+                        }
+                        char *mykey;
+                        mykey = (char *) malloc(sizeof(char)*(length + j));
+                        for (int d = 0; d < j; d++) {
+                            if(d == 0){
+                                strcpy(mykey,temp[d]);
+                            }
+                            else{
+                                strcat(mykey,temp[d]);
+                            }
+                            if(d != j-1){
+                                strcat(mykey," ");
+                            }
+                        }
+                        int hash1 = murmurhash(mykey,(uint32_t) strlen(mykey),0) % (M*32);
+                        int hash2 = hash_pearson(mykey) % (M*32);
+                        int hash3 = hash_jenkins(mykey) % (M*32);
+
+                        if((bitChecker(bitArray[hash1/32],hash1%32) == 0) || (bitChecker(bitArray[hash2/32],hash2%32) == 0) || (bitChecker(bitArray[hash3/32],hash3%32) == 0) || (bitChecker(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32) == 0) || (bitChecker(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32) == 0)){
+                            bitArray[hash1/32] = bitChanger(bitArray[hash1/32],hash1%32);
+                            bitArray[hash2/32] = bitChanger(bitArray[hash2/32],hash2%32);
+                            bitArray[hash3/32] = bitChanger(bitArray[hash3/32],hash3%32);
+                            bitArray[((hash2+hash1)%(M*32))/32] = bitChanger(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32);
+                            bitArray[((hash3+hash1)%(M*32))/32] = bitChanger(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32);
+
+                            if(found == 0){
+                                printer[id] = (char *) malloc(sizeof(char)*(strlen(mykey)+1));
+                                strcpy(printer[id],mykey);
+                            } else{
+                                int currentLen = strlen(printer[id]);
+                                printer[id] = (char *) realloc(printer[id], sizeof(char)*(currentLen+strlen(mykey)+2));
+                                strcat(printer[id],"|");
+                                strcat(printer[id],mykey);
+                            }
+                            pthread_mutex_lock(&heap_mtx);
+                            heap->insertKey(mykey);
+                            pthread_mutex_unlock(&heap_mtx);
+                        }
+                        free(mykey);
+                        found = 1;
+                    } else if(x == 0){
+                        break;
+                    }
+                }
+            }
+            if(found == 0){     // if there are no Ngrams int the query
+                printer[id] = (char *) malloc(sizeof(char)*(3));
+                strcpy(printer[id],"-1");
+            }
+        }
+    }
+
+    return NULL;
+}
+
+void *executeStatic(void *arg){
+    Head *head = threadParameter->head;
+    MaxHeap *heap = threadParameter->heap;
+    JobScheduler *scheduler = threadParameter->scheduler;
+    char **printer = threadParameter->printer;
+
+    while(1){
+        Job *job = scheduler->obtain();     // obtain from scheduler's queue
+        if (job == NULL) {
+            cout << "null" << endl;
+        }
+        int id = job->id;
+        char **query = job->query;
+        int whitespace = job->queryLen - 1;
+        if(strcmp(query[0],"poison") == 0){
+            break;
+        }
 
         uint32_t bitArray[M];
         for (int i = 0; i < M; i++) {
@@ -143,14 +220,11 @@ void *executeStatic(void *arg){
                             if(found == 0){
                                 printer[id] = (char *) malloc(sizeof(char)*(strlen(mykey)+1));
                                 strcpy(printer[id],mykey);
-                                // cout << mykey;
                             } else{
                                 int currentLen = strlen(printer[id]);
                                 printer[id] = (char *) realloc(printer[id], sizeof(char)*(currentLen+strlen(mykey)+2));
                                 strcat(printer[id],"|");
                                 strcat(printer[id],mykey);
-                                // cout << "|";
-                                // cout << mykey;
                             }
                             pthread_mutex_lock(&heap_mtx);
                             heap->insertKey(mykey);
@@ -166,17 +240,14 @@ void *executeStatic(void *arg){
             if(found == 0){     // if there are no Ngrams int the query
                 printer[id] = (char *) malloc(sizeof(char)*(3));
                 strcpy(printer[id],"-1");
-                // cout << "-1";
             }
-            // cout << endl;
         }
     }
-    // pthread_mutex_unlock(&printer_mtx);
+
     return NULL;
 }
 
 void JobScheduler::execute_all_jobs(int type) {
-
     int err;
     for (int i = 0; i < execution_threads; i++) {
         if( type == 0){
