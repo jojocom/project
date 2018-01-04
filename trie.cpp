@@ -72,7 +72,7 @@ RootNode::~RootNode(){
 }
 
 // constructor of trie nodes
-TrieNode::TrieNode(int capacity) : capacity(capacity), childNum(0), final(false),compressedNum(0),add(0),del(-1){
+TrieNode::TrieNode(int capacity) : capacity(capacity), childNum(0), final(false),compressedNum(0),add(0),del(-1),noChildNum(0){
     word = NULL;
     compressedLengths = NULL;
     childs = (TrieNode **) malloc(sizeof(TrieNode *));
@@ -117,6 +117,7 @@ void setNode(TrieNode *current,int capacity,bool final,char *word,int add,int de
     }
     current->capacity = capacity;
     current->childNum = 0;
+    current->noChildNum = 0;
     current->final = final;
     if(word != NULL){
         current->word = (char *) malloc(sizeof(char)*(strlen(word) + 1));
@@ -390,6 +391,7 @@ void insertNgram(char **query,int queryNum,Head *head,int counter){
                 }
             }
             currentNode->childNum++;
+            currentNode->noChildNum++;
 
             int cell = currentNode->childNum - 1;
             if(currentNode->childNum > 1){
@@ -580,7 +582,7 @@ void noInsertNgram(char **query,int queryNum,Head *head,int counter){
 }
 
 // searching Ngram int the trie
-int searchNgram(char **query,int queryNum,Head *head){
+int searchNgram(char **query,int queryNum,Head *head,int counter){
 
     TrieNode *currentNode = NULL;
     int found = 0;
@@ -595,11 +597,20 @@ int searchNgram(char **query,int queryNum,Head *head){
         if(head->root->hashtable[hash] != NULL){
             if((*head->root->hashtable[hash])[mid].word != NULL){
                 if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
-                    found = 1;
-                    currentNode = &(*head->root->hashtable[hash])[mid];
-                    if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
-                        if(currentNode->final == false){
-                            found = 2;
+                    if ((counter > (*head->root->hashtable[hash])[mid].add)) {
+                        if (((counter < (*head->root->hashtable[hash])[mid].del) && ((*head->root->hashtable[hash])[mid].del > -1)) || ((*head->root->hashtable[hash])[mid].del == -1)) {
+                            found = 1;
+                            currentNode = &(*head->root->hashtable[hash])[mid];
+                            if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                if(currentNode->final == false){
+                                    found = 2;
+                                }
+                            }
+                        } else if ((*head->root->hashtable[hash])[mid].del > -1) {
+                            if(currentNode->final == true){
+                                found = 2;
+                                currentNode = &(*head->root->hashtable[hash])[mid];
+                            }
                         }
                     }
                     break;
@@ -621,11 +632,20 @@ int searchNgram(char **query,int queryNum,Head *head){
                 if(currentNode->childs != NULL){
                     if((*currentNode->childs)[mid].word != NULL){
                         if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
-                            found = 1;
-                            currentNode = &(*currentNode->childs)[mid];
-                            if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
-                                if(currentNode->final == false){
-                                    found = 2;
+                            if ((counter > (*currentNode->childs)[mid].add)) {
+                                if (((counter < (*currentNode->childs)[mid].del) && ((*currentNode->childs)[mid].del > -1)) || ((*currentNode->childs)[mid].del == -1)) {
+                                    found = 1;
+                                    currentNode = &(*currentNode->childs)[mid];
+                                    if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                        if(currentNode->final == false){
+                                            found = 2;
+                                        }
+                                    }
+                                } else if ((*currentNode->childs)[mid].del > -1) {
+                                    if(currentNode->final == true){
+                                        found = 2;
+                                        currentNode = &(*currentNode->childs)[mid];
+                                    }
                                 }
                             }
                             break;
@@ -729,6 +749,7 @@ void deleteNgram(char **query,int queryNum,Head *head,int counter){
                 if(i == queryNum){                      // if node of last word of Ngram
                     if(path[i-1]->childNum != 0){           // if node has childs
                         path[i-1]->final = false;
+                        path[i-1]->del = -1;
                         break;
                     } else{
                         int cell = 0;
@@ -814,20 +835,21 @@ void noDeleteNgram(char **query,int queryNum,Head *head,int counter){
         }
     }
     if(found == 1){
-        if((currentNode->childNum == 0) && (queryNum == 1)){
-            free_trie(currentNode);             //delete node
-            if(currentNode->word != NULL){
-                free(currentNode->word);
-            }
-            memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
-            setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
-            head->root->items[hash]--;
+        if((currentNode->noChildNum == 0) && (queryNum == 1)){
+            currentNode->del = counter;
+            // free_trie(currentNode);             //delete node
+            // if(currentNode->word != NULL){
+            //     free(currentNode->word);
+            // }
+            // memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
+            // setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
+            // head->root->items[hash]--;
         } else{
             path[0] = currentNode;
             for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
                 found = 0;
                 int left = 0;
-                int right = currentNode->childNum - 1;
+                int right = currentNode->noChildNum - 1;
                 while(left <= right){                       // checking if i-th word of Ngram exists and where
                     int mid = left + ((right - left)/2);
                     if(currentNode->childs != NULL){
@@ -860,51 +882,55 @@ void noDeleteNgram(char **query,int queryNum,Head *head,int counter){
             }
             for (int i = queryNum; i > 0; i--) {                // deleting node of i-th word of Ngram
                 if(i == queryNum){                      // if node of last word of Ngram
-                    if(path[i-1]->childNum != 0){           // if node has childs
-                        path[i-1]->final = false;
+                    if(path[i-1]->noChildNum != 0){           // if node has childs
+                        // path[i-1]->final = false;
+                        path[i-1]->del = counter;
                         break;
                     } else{
                         int cell = 0;
-                        for (int j = 0; j < path[i-2]->childNum; j++) {         // find position of node in parent's array of childs
+                        for (int j = 0; j < path[i-2]->noChildNum; j++) {         // find position of node in parent's array of childs
                             if(strcmp((*path[i-2]->childs)[j].word,path[i-1]->word) == 0){
                                 cell = j;
                                 break;
                             }
                         }
-                        free_trie(&(*path[i-2]->childs)[cell]);             //delete node
-                        if((*path[i-2]->childs)[cell].word != NULL){
-                            free((*path[i-2]->childs)[cell].word);
-                        }
-                        path[i-2]->childNum--;
-                        memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
-                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
+                        path[i-2]->noChildNum--;
+                        (*path[i-2]->childs)[cell].del = counter;
+                        // free_trie(&(*path[i-2]->childs)[cell]);             //delete node
+                        // if((*path[i-2]->childs)[cell].word != NULL){
+                        //     free((*path[i-2]->childs)[cell].word);
+                        // }
+                        // memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
+                        // setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
                     }
                 } else if(i == 1){                      // if node of not last word of Ngram
-                    if((path[i-1]->childNum == 0) && (path[i-1]->final == false)){
-                        free_trie(&(*head->root->hashtable[hash])[mid]);             //delete node
-                        if((*head->root->hashtable[hash])[mid].word != NULL){
-                            free((*head->root->hashtable[hash])[mid].word);
-                        }
-                        memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
-                        setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
-                        head->root->items[hash]--;
+                    if((path[i-1]->noChildNum == 0) && (path[i-1]->final == false)){
+                        (*head->root->hashtable[hash])[mid].del = counter;
+                        // free_trie(&(*head->root->hashtable[hash])[mid]);             //delete node
+                        // if((*head->root->hashtable[hash])[mid].word != NULL){
+                        //     free((*head->root->hashtable[hash])[mid].word);
+                        // }
+                        // memmove(&(*head->root->hashtable[hash])[mid],&(*head->root->hashtable[hash])[mid+1],sizeof(TrieNode)*(head->root->items[hash]-mid-1));
+                        // setNode(&(*head->root->hashtable[hash])[head->root->items[hash]-1],N,false,NULL,0,-1);
+                        // head->root->items[hash]--;
                     } else break;
                 } else{                      // if node of not last word of Ngram
-                    if((path[i-1]->childNum == 0) && (path[i-1]->final == false) && (path[i-1]->word != NULL)){           // if node has not childs,is not final and is not head->root
+                    if((path[i-1]->noChildNum == 0) && (path[i-1]->final == false) && (path[i-1]->word != NULL)){           // if node has not childs,is not final and is not head->root
                         int cell = 0;
-                        for (int j = 0; j < path[i-2]->childNum; j++) {         // find position of node in parent's array of childs
+                        for (int j = 0; j < path[i-2]->noChildNum; j++) {         // find position of node in parent's array of childs
                             if(strcmp((*path[i-2]->childs)[j].word,path[i-1]->word) == 0){
                                 cell = j;
                                 break;
                             }
                         }
-                        free_trie(&(*path[i-2]->childs)[cell]);             //delete node
-                        if((*path[i-2]->childs)[cell].word != NULL){
-                            free((*path[i-2]->childs)[cell].word);
-                        }
-                        path[i-2]->childNum--;
-                        memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
-                        setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
+                        path[i-2]->noChildNum--;
+                        (*path[i-2]->childs)[cell].del = counter;
+                        // free_trie(&(*path[i-2]->childs)[cell]);             //delete node
+                        // if((*path[i-2]->childs)[cell].word != NULL){
+                        //     free((*path[i-2]->childs)[cell].word);
+                        // }
+                        // memmove(&(*path[i-2]->childs)[cell],&(*path[i-2]->childs)[cell+1],sizeof(TrieNode)*(path[i-2]->childNum-cell));         // move childs that are right of the node, that we deleted, in the array
+                        // setNode(&(*path[i-2]->childs)[path[i-2]->childNum],N,false,NULL,0,-1);
                     } else break;
                 }
             }

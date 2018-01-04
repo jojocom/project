@@ -14,6 +14,7 @@ public:
     short *compressedLengths;
     int add;
     int del;
+    int noChildNum;
 
     TrieNode();
     TrieNode(int capacity);
@@ -46,7 +47,7 @@ void free_trie(TrieNode *current);
 Head * trieCreate(char *fileName,int *compress);
 void insertNgram(char **query,int queryNum,Head *head,int counter);
 void noInsertNgram(char **query,int queryNum,Head *head,int counter);
-int searchNgram(char **query,int queryNum,Head *head);
+int searchNgram(char **query,int queryNum,Head *head,int counter);
 void deleteNgram(char **query,int queryNum,Head *head,int counter);
 void noDeleteNgram(char **query,int queryNum,Head *head,int counter);
 void queryRead(char *queryFileName,Head *head);

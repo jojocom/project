@@ -98,7 +98,7 @@ void *executeDynamic(void *arg){
             for (int k = 0; k < whitespace; k++) {
                 char **temp = queryStart + k;
                 for (int j = 1; j <= whitespace-k; j++) {
-                    int x = searchNgram(temp,j,head);
+                    int x = searchNgram(temp,j,head,id);
                     if(x == 1){
                         int length = 0;
                         for (int d = 0; d < j; d++) {

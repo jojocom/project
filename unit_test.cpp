@@ -134,8 +134,8 @@ int main(int argc, char *argv[]) {
     char **query6 = new char*[2];
     query6[0] = word1;
     query6[1] = word5;
-    assert(searchNgram(query6,2,head) == 0);
-    assert(searchNgram(query5,2,head) == 1);
+    assert(searchNgram(query6,2,head,0) == 0);
+    assert(searchNgram(query5,2,head,0) == 1);
 // check sortChilds
     TrieNode *node = new TrieNode(6);
     node->childNum = 6;
