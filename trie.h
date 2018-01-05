@@ -46,7 +46,7 @@ void setNode(TrieNode *current,int capacity,bool final,char *word,int add,int de
 void free_trie(TrieNode *current);
 Head * trieCreate(char *fileName,int *compress);
 void insertNgram(char **query,int queryNum,Head *head,int counter);
-void noInsertNgram(char **query,int queryNum,Head *head,int counter);
+int cleanup(char **query,int queryNum,Head *head,int counter);
 int searchNgram(char **query,int queryNum,Head *head,int counter);
 void deleteNgram(char **query,int queryNum,Head *head,int counter);
 void noDeleteNgram(char **query,int queryNum,Head *head,int counter);

@@ -76,6 +76,7 @@ void *executeDynamic(void *arg){
     char **printer = threadParameter->printer;
 
     while(1){
+        // std::cout << "while" << '\n';
         Job *job = scheduler->obtain();     // obtain from scheduler's queue
         if (job == NULL) {
             cout << "null" << endl;
@@ -94,11 +95,14 @@ void *executeDynamic(void *arg){
         char **queryStart = query + 1;
 
         if(strcmp(query[0],"Q") == 0){              // for Q query
+            // std::cout << "after Q" << '\n';
             int found = 0;
             for (int k = 0; k < whitespace; k++) {
                 char **temp = queryStart + k;
                 for (int j = 1; j <= whitespace-k; j++) {
+                    // std::cout << "before searchNgram" << '\n';
                     int x = searchNgram(temp,j,head,id);
+                    // std::cout << "after searchNgram" << '\n';
                     if(x == 1){
                         int length = 0;
                         for (int d = 0; d < j; d++) {
@@ -127,7 +131,7 @@ void *executeDynamic(void *arg){
                             bitArray[hash3/32] = bitChanger(bitArray[hash3/32],hash3%32);
                             bitArray[((hash2+hash1)%(M*32))/32] = bitChanger(bitArray[((hash2+hash1)%(M*32))/32],((hash2+hash1)%(M*32))%32);
                             bitArray[((hash3+hash1)%(M*32))/32] = bitChanger(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32);
-
+                            // std::cout << "before printer" << '\n';
                             if(found == 0){
                                 printer[id] = (char *) malloc(sizeof(char)*(strlen(mykey)+1));
                                 strcpy(printer[id],mykey);
@@ -137,6 +141,7 @@ void *executeDynamic(void *arg){
                                 strcat(printer[id],"|");
                                 strcat(printer[id],mykey);
                             }
+                            // std::cout << "after printer" << '\n';
                             pthread_mutex_lock(&heap_mtx);
                             heap->insertKey(mykey);
                             pthread_mutex_unlock(&heap_mtx);

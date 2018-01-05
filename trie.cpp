@@ -11,7 +11,7 @@
 #include "hash_functions.h"
 #include "jobScheduler.h"
 #define STARTSIZE 10
-#define THREADSNUM 8
+#define THREADSNUM 1
 
 using namespace std;
 
@@ -403,187 +403,84 @@ void insertNgram(char **query,int queryNum,Head *head,int counter){
 }
 
 // inserting Ngram to the trie
-void noInsertNgram(char **query,int queryNum,Head *head,int counter){
-    TrieNode *currentNode = NULL;
-    int found = 0;
-    int hash = hashcii(query[0]) % head->root->size;
-    if(hash < head->root->split){
-        hash = hashcii(query[0]) % head->root->newsize;
-    }
-    int left = 0;
-    int right = head->root->items[hash] - 1;
-    while(left <= right){                       // checking if 1st word of Ngram exists and where
-        int mid = left + ((right - left)/2);
-        if(head->root->hashtable[hash] != NULL){
-            if((*head->root->hashtable[hash])[mid].word != NULL){
-                if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
-                    found = 1;
-                    currentNode = &(*head->root->hashtable[hash])[mid];
-                    break;
-                } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) < 0){
-                    right = mid - 1;
-                } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) > 0){
-                    left = mid + 1;
-                }
-            }
+int cleanup(char **query,int queryNum,Head *head,int counter){
+
+        TrieNode *currentNode = NULL;
+        int found = 0;
+        int hash = hashcii(query[0]) % head->root->size;
+        if(hash < head->root->split){
+            hash = hashcii(query[0]) % head->root->newsize;
         }
-    }
-    if(found == 0){
-        if(head->root->bucketSizes[hash] == head->root->items[hash]){
-            *head->root->hashtable[hash] = (TrieNode *) realloc((*head->root->hashtable[hash]),sizeof(TrieNode)*2*(head->root->bucketSizes[hash]));
-            head->root->bucketSizes[hash] = head->root->bucketSizes[hash]*2;
-            for (int i = head->root->bucketSizes[hash]/2; i < head->root->bucketSizes[hash]; i++) {
-                setNode(&(*head->root->hashtable[hash])[i],N,false,NULL,0,-1);
-            }
-            if(queryNum == 1){
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0],counter,-2);
-            } else{
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0],counter,-2);
-            }
-            (*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode **) malloc(sizeof(TrieNode*));
-            *(*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
-            for (int j = 0; j < N; j++) {
-                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL,0,-1);
-            }
-            head->root->items[hash]++;
-            if(hash != head->root->split){
-                int cell = head->root->items[hash] - 1;
-                if(head->root->items[hash] > 1){
-                    cell = sortCell(head->root,hash);
-                }
-                currentNode = &(*head->root->hashtable[hash])[cell];
-            }
-            head->root->hashtable = (TrieNode ***) realloc(head->root->hashtable,sizeof(TrieNode **)*(head->root->currentSize+1));
-            head->root->currentSize++;
-            head->root->hashtable[head->root->currentSize-1] = (TrieNode **) malloc(sizeof(TrieNode *));
-            *head->root->hashtable[head->root->currentSize-1] = (TrieNode *) malloc(sizeof(TrieNode)*BucketLen);
-            for (int e = 0; e < BucketLen; e++) {
-                setNode(&(*head->root->hashtable[head->root->currentSize-1])[e],N,false,NULL,0,-1);
-            }
-            head->root->items = (int *) realloc(head->root->items,sizeof(int)*head->root->currentSize);
-            head->root->items[head->root->currentSize-1] = 0;
-            head->root->bucketSizes = (int *) realloc(head->root->bucketSizes,sizeof(int)*head->root->currentSize);
-            head->root->bucketSizes[head->root->currentSize-1] = BucketLen;
-            // split bucket
-            for (int i = 0; i < head->root->items[head->root->split]; i++) {
-                int newhash = 0;
-                newhash = hashcii((*head->root->hashtable[head->root->split])[i].word) % head->root->newsize;
-                if(newhash != head->root->split){
-                    if(head->root->bucketSizes[newhash] == head->root->items[newhash]){
-                        *head->root->hashtable[newhash] = (TrieNode *) realloc((*head->root->hashtable[newhash]),sizeof(TrieNode)*2*(head->root->bucketSizes[newhash]));
-                        head->root->bucketSizes[newhash] = head->root->bucketSizes[newhash]*2;
-                        for (int i = head->root->bucketSizes[newhash]/2; i < head->root->bucketSizes[newhash]; i++) {
-                            setNode(&(*head->root->hashtable[newhash])[i],N,false,NULL,0,-1);
-                        }
-                    }
-                    // move to new bucket
-                    memmove(&(*head->root->hashtable[newhash])[head->root->items[newhash]],&(*head->root->hashtable[head->root->split])[i],sizeof(TrieNode));
-                    if((head->root->items[head->root->split]-i-1) != 0){
-                        // move other items 1 position left
-                        memmove(&(*head->root->hashtable[head->root->split])[i],&(*head->root->hashtable[head->root->split])[i+1],sizeof(TrieNode)*(head->root->items[head->root->split]-i-1));
-                    }
-                    setNode(&(*head->root->hashtable[head->root->split])[head->root->items[head->root->split]-1],N,false,NULL,0,-1);
-                    head->root->items[newhash]++;
-                    head->root->items[head->root->split]--;
-                    i--;
-                }
-                if((i == head->root->items[head->root->split]-1) && (head->root->split == hash)){
-                    int cell = head->root->items[newhash] - 1;
-                    if(head->root->items[newhash] > 1){
-                        cell = sortCell(head->root,newhash);
-                    }
-                    currentNode = &(*head->root->hashtable[newhash])[cell];
-                }
-            }
-            head->root->split++;
-            if(head->root->split == head->root->size){
-                head->root->split = 0;
-                head->root->size = head->root->newsize;
-                head->root->newsize = 2*head->root->newsize;
-            }
-        } else{
-            if(queryNum == 1){
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,true,query[0],counter,-2);
-            } else{
-                setNode(&(*head->root->hashtable[hash])[head->root->items[hash]],N,false,query[0],counter,-2);
-            }
-            (*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode **) malloc(sizeof(TrieNode*));
-            *(*head->root->hashtable[hash])[head->root->items[hash]].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
-            for (int j = 0; j < N; j++) {
-                setNode(&(*(*head->root->hashtable[hash])[head->root->items[hash]].childs)[j],N,false,NULL,0,-1);
-            }
-            head->root->items[hash]++;
-            int cell = head->root->items[hash] - 1;
-            if(head->root->items[hash] > 1){
-                cell = sortCell(head->root,hash);
-            }
-            currentNode = &(*head->root->hashtable[hash])[cell];
-        }
-    } else{
-        if(queryNum == 1){
-            currentNode->final = true;
-        }
-    }
-    for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
-        found = 0;
-        left = 0;
-        right = currentNode->childNum - 1;
-        while(left <= right){                       // checking if i-th word of Ngram exists and where
+        int left = 0;
+        int right = head->root->items[hash] - 1;
+        while(left <= right){                       // checking if 1st word of Ngram exists and where
             int mid = left + ((right - left)/2);
-            if(currentNode->childs != NULL){
-                if((*currentNode->childs)[mid].word != NULL){
-                    if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
+            if(head->root->hashtable[hash] != NULL){
+                if((*head->root->hashtable[hash])[mid].word != NULL){
+                    if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
                         found = 1;
-                        currentNode = &(*currentNode->childs)[mid];
-                        if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
-                            currentNode->final = true;
+                        currentNode = &(*head->root->hashtable[hash])[mid];
+                        currentNode->add = 0;
+                        currentNode->del = -1;
+                        if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                            if(currentNode->final == false){
+                                found = 2;
+                            }
                         }
                         break;
-                    } else if(strcmp(query[i],(*currentNode->childs)[mid].word) < 0){
+                    } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) < 0){
                         right = mid - 1;
-                    } else if(strcmp(query[i],(*currentNode->childs)[mid].word) > 0){
+                    } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) > 0){
                         left = mid + 1;
                     }
                 }
             }
         }
-        if(found == 0){                     // if i-th word of Ngram does not exist
-            if(currentNode->childNum == currentNode->capacity){             // if array of childs need expansion
-                *currentNode->childs = (TrieNode *) realloc(*currentNode->childs,sizeof(TrieNode)*currentNode->capacity*2);
-                currentNode->capacity = currentNode->capacity*2;
-                for (int j = currentNode->childNum; j < currentNode->capacity; j++) {
-                    setNode(&(*currentNode->childs)[j],N,false,NULL,0,-1);
+        if(found == 1){
+            for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
+                found = 0;
+                int left = 0;
+                int right = currentNode->childNum - 1;
+                while(left <= right){                       // checking if i-th word of Ngram exists and where
+                    int mid = left + ((right - left)/2);
+                    if(currentNode->childs != NULL){
+                        if((*currentNode->childs)[mid].word != NULL){
+                            if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
+                                found = 1;
+                                currentNode = &(*currentNode->childs)[mid];
+                                currentNode->add = 0;
+                                currentNode->del = -1;
+                                if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                    if(currentNode->final == false){
+                                        found = 2;
+                                    }
+                                }
+                                break;
+                            } else if(strcmp(query[i],(*currentNode->childs)[mid].word) < 0){
+                                right = mid - 1;
+                            } else if(strcmp(query[i],(*currentNode->childs)[mid].word) > 0){
+                                left = mid + 1;
+                            }
+                        }
+                    }
+                }
+                if(found == 0){                     // if i-th word of Ngram does not exist
+                    return 0;
                 }
             }
-            if(i == queryNum - 1){                  // creating node for last word of Ngram
-                setNode(&(*currentNode->childs)[currentNode->childNum],N,true,query[i],counter,-2);
-                (*currentNode->childs)[currentNode->childNum].childs = (TrieNode **) malloc(sizeof(TrieNode*));
-                *(*currentNode->childs)[currentNode->childNum].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
-                for (int j = 0; j < N; j++) {
-                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL,0,-1);
-                }
-            } else {                        // creating node for not last word of Ngram
-                setNode(&(*currentNode->childs)[currentNode->childNum],N,false,query[i],counter,-2);
-                (*currentNode->childs)[currentNode->childNum].childs = (TrieNode **) malloc(sizeof(TrieNode*));
-                *(*currentNode->childs)[currentNode->childNum].childs = (TrieNode *) malloc(sizeof(TrieNode)*N);
-                for (int j = 0; j < N; j++) {
-                    setNode(&(*(*currentNode->childs)[currentNode->childNum].childs)[j],N,false,NULL,0,-1);
-                }
-            }
-            currentNode->childNum++;
-
-            int cell = currentNode->childNum - 1;
-            if(currentNode->childNum > 1){
-                cell = sortChilds(currentNode);             // binary insertion sort of the array of childs
-            }
-            currentNode = &(*currentNode->childs)[cell];
         }
-    }
+        if(found == 1){
+            return 1;
+        } else if(found == 2){
+            return 2;
+        }
+
+        return 0;
 }
 
 // searching Ngram int the trie
 int searchNgram(char **query,int queryNum,Head *head,int counter){
-
+    // std::cout << "searchNgram" << '\n';
     TrieNode *currentNode = NULL;
     int found = 0;
     int hash = hashcii(query[0]) % head->root->size;
@@ -593,11 +490,12 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
     int left = 0;
     int right = head->root->items[hash] - 1;
     while(left <= right){                       // checking if 1st word of Ngram exists and where
+        // std::cout << "while" << '\n';
         int mid = left + ((right - left)/2);
         if(head->root->hashtable[hash] != NULL){
             if((*head->root->hashtable[hash])[mid].word != NULL){
                 if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
-                    if ((counter > (*head->root->hashtable[hash])[mid].add)) {
+                    if ((counter >= (*head->root->hashtable[hash])[mid].add)) {
                         if (((counter < (*head->root->hashtable[hash])[mid].del) && ((*head->root->hashtable[hash])[mid].del > -1)) || ((*head->root->hashtable[hash])[mid].del == -1)) {
                             found = 1;
                             currentNode = &(*head->root->hashtable[hash])[mid];
@@ -606,8 +504,9 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                     found = 2;
                                 }
                             }
-                        } else if ((*head->root->hashtable[hash])[mid].del > -1) {
-                            if(currentNode->final == true){
+                        }
+                        else if ((*head->root->hashtable[hash])[mid].del > -1) {
+                            if((*head->root->hashtable[hash])[mid].final == true){
                                 found = 2;
                                 currentNode = &(*head->root->hashtable[hash])[mid];
                             }
@@ -623,6 +522,7 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
         }
     }
     if(found == 1){
+        // std::cout << "after found == 1" << '\n';
         for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
             found = 0;
             int left = 0;
@@ -632,7 +532,7 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                 if(currentNode->childs != NULL){
                     if((*currentNode->childs)[mid].word != NULL){
                         if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
-                            if ((counter > (*currentNode->childs)[mid].add)) {
+                            if ((counter >= (*currentNode->childs)[mid].add)) {
                                 if (((counter < (*currentNode->childs)[mid].del) && ((*currentNode->childs)[mid].del > -1)) || ((*currentNode->childs)[mid].del == -1)) {
                                     found = 1;
                                     currentNode = &(*currentNode->childs)[mid];
@@ -641,8 +541,9 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                             found = 2;
                                         }
                                     }
-                                } else if ((*currentNode->childs)[mid].del > -1) {
-                                    if(currentNode->final == true){
+                                }
+                                else if ((*currentNode->childs)[mid].del > -1) {
+                                    if((*currentNode->childs)[mid].final == true){
                                         found = 2;
                                         currentNode = &(*currentNode->childs)[mid];
                                     }
@@ -807,7 +708,7 @@ void deleteNgram(char **query,int queryNum,Head *head,int counter){
 
 // deleting Ngram from the trie
 void noDeleteNgram(char **query,int queryNum,Head *head,int counter){
-
+    // std::cout << "noDeleteNgram start" << '\n';
     TrieNode **path = new TrieNode*[queryNum+1];
     TrieNode *currentNode = NULL;
     int found = 0;
@@ -940,6 +841,7 @@ void noDeleteNgram(char **query,int queryNum,Head *head,int counter){
         path[j] = NULL;
     }
     delete [] path;
+    // std::cout << "noDeleteNgram end" << '\n';
     return ;
 }
 
@@ -1006,23 +908,28 @@ void queryRead(char *queryFileName,Head *head){
                 }
                 currentSize = 2*currentSize;
             }
-            counter++;
             if (strcmp(query[0],"Q") == 0 ){
                 // std::cout << "Q" << '\n';
                 jobsArray[counter] = new Job(counter,whitespace+1,query);
+                counter++;
             } else if (strcmp(query[0],"A") == 0 ){
-                // addcounter++;
                 // std::cout << "A" << '\n';
                 insertNgram(queryStart,whitespace,head,counter);
                 jobsArray[counter] = new Job(-1,whitespace+1,query);
+                counter++;
             } else if (strcmp(query[0],"D") == 0) {
-                // delcounter++;
                 // std::cout << "D" << '\n';
                 noDeleteNgram(queryStart,whitespace,head,counter);
+                // std::cout << "before" << '\n';
                 jobsArray[counter] = new Job(-2,whitespace+1,query);
+                counter++;
+                // std::cout << "after" << '\n';
             } else if (strcmp(query[0],"F") == 0){
                 // std::cout << "F" << '\n';
                 char **printer = (char **) malloc(sizeof(char *)*(counter));
+                for (int i = 0; i < counter; i++) {
+                    printer[i] = NULL;
+                }
                 // std::cout << "111" << '\n';
                 threadParameter->printer = printer;
                 // std::cout << "before create" << '\n';
@@ -1056,10 +963,13 @@ void queryRead(char *queryFileName,Head *head){
                     }
                 }
                 // std::cout << "after join" << '\n';
+                // std::cout << "counter: " << counter << '\n';
                 for (int i = 0; i < counter; i++) {
+                    // std::cout << "before printer: " << i << '\n';
                     if (printer[i] != NULL) {
                         cout << printer[i] << endl;
                     }
+                    // std::cout << "after printer: " << i << '\n';
                 }
                 for (int i = 0; i < counter; i++) {
                     if (printer[i] != NULL) {
@@ -1090,14 +1000,18 @@ void queryRead(char *queryFileName,Head *head){
 
                 // noInsertNgram
                 for (int i = 0; i < counter; i++) {
-                    if (jobsArray[i] != NULL && jobsArray[i]->id == -1) {
-                        noInsertNgram(queryStart,whitespace,head,counter);
+                    if (jobsArray[i] != NULL) {
+                        if (jobsArray[i]->id == -1) {
+                            cleanup(queryStart,whitespace,head,counter);
+                        }
                     }
                 }
                 // deleteNgram
                 for (int i = 0; i < counter; i++) {
-                    if (jobsArray[i] != NULL && jobsArray[i]->id == -2) {
-                        deleteNgram(queryStart,whitespace,head,counter);
+                    if (jobsArray[i] != NULL) {
+                        if (jobsArray[i]->id == -2) {
+                            deleteNgram(queryStart,whitespace,head,counter);
+                        }
                     }
                 }
 

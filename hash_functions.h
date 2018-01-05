@@ -1,3 +1,5 @@
+int bitChecker(int value, int s);
+int bitChanger(int value, int s);
 size_t hash_jenkins(const char* s);
 uint32_t murmurhash (const char *key, uint32_t len, uint32_t seed);
 int hashcii(const char* key);

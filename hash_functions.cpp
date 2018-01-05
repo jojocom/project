@@ -5,6 +5,16 @@
 #include <string.h>
 #include "hash_functions.h"
 
+int bitChecker(int value, int s) {
+    int mask = 1 << s;
+    return (value & mask) >> s;
+}
+
+int bitChanger(int value, int s) {
+    int mask = 1 << s;
+    return (value | mask);
+}
+
 size_t hash_jenkins(const char* s){
    size_t hash = 0;
 
