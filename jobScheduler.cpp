@@ -102,7 +102,7 @@ void *executeDynamic(void *arg){
                 for (int j = 1; j <= whitespace-k; j++) {
                     // std::cout << "before searchNgram" << '\n';
                     int x = searchNgram(temp,j,head,id);
-                    // std::cout << "after searchNgram" << '\n';
+                    // std::cout << "x: " << x << '\n';
                     if(x == 1){
                         int length = 0;
                         for (int d = 0; d < j; d++) {

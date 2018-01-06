@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {                                              
         // reading queries
         // std::cout << "main" << '\n';
         queryRead(queryFileName,head);
+        // print(head->root);
     } else{
         trieCompress(head);
         queryStaticRead(queryFileName,head);
