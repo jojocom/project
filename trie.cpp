@@ -10,8 +10,8 @@
 #include "list.h"
 #include "hash_functions.h"
 #include "jobScheduler.h"
-#define STARTSIZE 10
-#define THREADSNUM 1
+#define STARTSIZE 20
+#define THREADSNUM 14
 
 using namespace std;
 
@@ -406,7 +406,7 @@ void insertNgram(char **query,int queryNum,Head *head,int counter){
 
 // inserting Ngram to the trie
 int cleanup(char **query,int queryNum,Head *head,int counter){
-
+        // std::cout << "cleanup start" << '\n';
         TrieNode *currentNode = NULL;
         int found = 0;
         int hash = hashcii(query[0]) % head->root->size;
@@ -416,10 +416,12 @@ int cleanup(char **query,int queryNum,Head *head,int counter){
         int left = 0;
         int right = head->root->items[hash] - 1;
         while(left <= right){                       // checking if 1st word of Ngram exists and where
+            // std::cout << "while" << '\n';
             int mid = left + ((right - left)/2);
             if(head->root->hashtable[hash] != NULL){
                 if((*head->root->hashtable[hash])[mid].word != NULL){
                     if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) == 0){
+                        // std::cout << "after strcmp" << '\n';
                         found = 1;
                         currentNode = &(*head->root->hashtable[hash])[mid];
                         currentNode->add = 0;
@@ -429,6 +431,7 @@ int cleanup(char **query,int queryNum,Head *head,int counter){
                                 found = 2;
                             }
                         }
+                        // std::cout << "before break" << '\n';
                         break;
                     } else if(strcmp(query[0],(*head->root->hashtable[hash])[mid].word) < 0){
                         right = mid - 1;
@@ -439,15 +442,21 @@ int cleanup(char **query,int queryNum,Head *head,int counter){
             }
         }
         if(found == 1){
+            // std::cout << "after if" << '\n';
             for (int i = 1; i < queryNum; i++) {                // for each word of the Ngram
                 found = 0;
                 int left = 0;
                 int right = currentNode->childNum - 1;
                 while(left <= right){                       // checking if i-th word of Ngram exists and where
+                    // std::cout << "after while" << '\n';
                     int mid = left + ((right - left)/2);
                     if(currentNode->childs != NULL){
+                        // std::cout << "after currentNode->childs" << '\n';
                         if((*currentNode->childs)[mid].word != NULL){
+                            // std::cout << "after currentNode->childs.word" << '\n';
+                            // std::cout << query[i] << '\n';
                             if(strcmp(query[i],(*currentNode->childs)[mid].word) == 0){
+                                // std::cout << "after 2nd strcmp" << '\n';
                                 found = 1;
                                 currentNode = &(*currentNode->childs)[mid];
                                 currentNode->add = 0;
@@ -457,6 +466,7 @@ int cleanup(char **query,int queryNum,Head *head,int counter){
                                         found = 2;
                                     }
                                 }
+                                // std::cout << "before 2nd break" << '\n';
                                 break;
                             } else if(strcmp(query[i],(*currentNode->childs)[mid].word) < 0){
                                 right = mid - 1;
@@ -505,7 +515,11 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                 currentNode = &(*head->root->hashtable[hash])[mid];
                                 if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                     if(currentNode->final == false){
-                                        found = 2;
+                                        if (currentNode->childNum > 0) {
+                                            found = 2;
+                                        } else{
+                                            found = 0;
+                                        }
                                     }
                                 }
                             } else if ((*head->root->hashtable[hash])[mid].del < (*head->root->hashtable[hash])[mid].add) {
@@ -514,16 +528,22 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                 currentNode = &(*head->root->hashtable[hash])[mid];
                                 if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                     if(currentNode->final == false){
-                                        found = 2;
+                                        if (currentNode->childNum > 0) {
+                                            found = 2;
+                                        } else{
+                                            found = 0;
+                                        }
                                     }
                                 }
                             } else{
                                 // std::cout << "(A)DQ" << '\n';
-                                if ((*head->root->hashtable[hash])[mid].add > 0) {
-                                    if ((*head->root->hashtable[hash])[mid].final == true) {
-                                        if((*head->root->hashtable[hash])[mid].childNum > 0){
-                                            found = 2;
-                                        }
+                                found = 1;
+                                currentNode = &(*head->root->hashtable[hash])[mid];
+                                if(queryNum == 1){
+                                    if ((*head->root->hashtable[hash])[mid].childNum > 0) {
+                                        found = 2;
+                                    } else{
+                                        found = 0;
                                     }
                                 }
                             }
@@ -533,7 +553,11 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                             currentNode = &(*head->root->hashtable[hash])[mid];
                             if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                 if(currentNode->final == false){
-                                    found = 2;
+                                    if (currentNode->childNum > 0) {
+                                        found = 2;
+                                    } else{
+                                        found = 0;
+                                    }
                                 }
                             }
                         }
@@ -590,27 +614,37 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                         // std::cout << "(A)QD" << '\n';
                                         found = 1;
                                         currentNode = &(*currentNode->childs)[mid];
-                                        if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                        if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                             if(currentNode->final == false){
-                                                found = 2;
+                                                if (currentNode->childNum > 0) {
+                                                    found = 2;
+                                                } else{
+                                                    found = 0;
+                                                }
                                             }
                                         }
                                     } else if ((*currentNode->childs)[mid].del < (*currentNode->childs)[mid].add) {
                                         // std::cout << "DAQ" << '\n';
                                         found = 1;
                                         currentNode = &(*currentNode->childs)[mid];
-                                        if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                        if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                             if(currentNode->final == false){
-                                                found = 2;
+                                                if (currentNode->childNum > 0) {
+                                                    found = 2;
+                                                } else{
+                                                    found = 0;
+                                                }
                                             }
                                         }
                                     } else{
                                         // std::cout << "(A)DQ" << '\n';
-                                        if ((*currentNode->childs)[mid].add > 0) {
-                                            if ((*currentNode->childs)[mid].final == true) {
-                                                if((*currentNode->childs)[mid].childNum > 0){
-                                                    found = 2;
-                                                }
+                                        found = 1;
+                                        currentNode = &(*currentNode->childs)[mid];
+                                        if(i == queryNum - 1){
+                                            if (currentNode->childNum > 0) {
+                                                found = 2;
+                                            } else{
+                                                found = 0;
                                             }
                                         }
                                     }
@@ -618,9 +652,13 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                     // std::cout << "(A)Q" << '\n';
                                     found = 1;
                                     currentNode = &(*currentNode->childs)[mid];
-                                    if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                    if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                         if(currentNode->final == false){
-                                            found = 2;
+                                            if (currentNode->childNum > 0) {
+                                                found = 2;
+                                            } else{
+                                                found = 0;
+                                            }
                                         }
                                     }
                                 }
@@ -630,11 +668,15 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                         // std::cout << "QD" << '\n';
                                         found = 1;
                                         currentNode = &(*currentNode->childs)[mid];
-                                        if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                        if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                             if(currentNode->final == false){
                                                 found = 2;
-                                            } else if(currentNode->final == true && (*currentNode->childs)[mid].add != 0){
-                                                found = 2;
+                                            } else if(currentNode->final == true && currentNode->add != 0){
+                                                if (currentNode->childNum > 0) {
+                                                    found = 2;
+                                                } else{
+                                                    found = 0;
+                                                }
                                             }
                                         }
                                     }
@@ -642,11 +684,15 @@ int searchNgram(char **query,int queryNum,Head *head,int counter){
                                     // std::cout << "QA" << '\n';
                                     found = 1;
                                     currentNode = &(*currentNode->childs)[mid];
-                                    if(queryNum == 1){          // if all Ngram words exists, checking if last word of Ngram is final
+                                    if(i == queryNum - 1){          // if all Ngram words exists, checking if last word of Ngram is final
                                         if(currentNode->final == false){
                                             found = 2;
-                                        } else if(currentNode->final == true && (*currentNode->childs)[mid].add != 0){
-                                            found = 2;
+                                        } else if(currentNode->final == true && currentNode->add != 0){
+                                            if (currentNode->childNum > 0) {
+                                                found = 2;
+                                            } else{
+                                                found = 0;
+                                            }
                                         }
                                     }
                                 }
@@ -1082,32 +1128,51 @@ void queryRead(char *queryFileName,Head *head){
                 threadParameter->printer = NULL;
                 if(whitespace != 0){
                     int k = atoi(query[1]);
-                    cout << "Top: ";
-                    for (int i = 0; i < k; i++) {
-                        pthread_mutex_lock(&heap_mtx);
-                        Element *el1 = heap->extractMax();
-                        pthread_mutex_unlock(&heap_mtx);
-                        if(el1 != NULL){
-                            if( i == k-1){
-                                cout << el1->word << endl;
-                            } else{
-                                cout << el1->word << "|";
-                            }
-                            if(heap->elements != 0){
-                                delete el1;
+                    if(heap->elements != 0){
+                        cout << "Top: ";
+                        for (int i = 0; i < k; i++) {
+                            Element *el1 = heap->extractMax();
+                            if(el1 != NULL){
+                                if( i == k-1){
+                                    cout << el1->word;
+                                } else{
+                                    cout << el1->word << "|";
+                                }
+                                if(heap->elements != 0){
+                                    delete el1;
+                                }
                             }
                         }
-                        // else{
-                        //     cout << endl;
-                        // }
+                        cout << endl;
                     }
+                    // cout << "Top: ";
+                    // for (int i = 0; i < k; i++) {
+                    //     pthread_mutex_lock(&heap_mtx);
+                    //     Element *el1 = heap->extractMax();
+                    //     pthread_mutex_unlock(&heap_mtx);
+                    //     if(el1 != NULL){
+                    //         if( i == k-1){
+                    //             cout << el1->word << endl;
+                    //         } else{
+                    //             cout << el1->word << "|";
+                    //         }
+                    //         if(heap->elements != 0){
+                    //             delete el1;
+                    //         }
+                    //     }
+                    //     // else{
+                    //     //     cout << endl;
+                    //     // }
+                    // }
                 }
 
                 // noInsertNgram
                 for (int i = 0; i < counter; i++) {
                     if (jobsArray[i] != NULL) {
                         if (jobsArray[i]->id == -1) {
-                            cleanup(queryStart,whitespace,head,counter);
+                            // std::cout << "before cleanup " << i << '\n';
+                            cleanup(jobsArray[i]->query + 1,jobsArray[i]->queryLen-1,head,counter);
+                            // std::cout << "after cleanup " << i << '\n';
                         }
                     }
                 }
@@ -1115,7 +1180,9 @@ void queryRead(char *queryFileName,Head *head){
                 for (int i = 0; i < counter; i++) {
                     if (jobsArray[i] != NULL) {
                         if (jobsArray[i]->id == -2) {
-                            deleteNgram(queryStart,whitespace,head,counter);
+                            // std::cout << "before delete " << i << '\n';
+                            deleteNgram(jobsArray[i]->query + 1,jobsArray[i]->queryLen-1,head,counter);
+                            // std::cout << "after delete " << i << '\n';
                         }
                     }
                 }
@@ -1139,8 +1206,6 @@ void queryRead(char *queryFileName,Head *head){
                 }
                 currentSize = STARTSIZE;
                 counter = 0;
-                // addcounter = 0;
-                // delcounter = 0;
             }
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);

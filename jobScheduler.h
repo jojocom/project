@@ -1,6 +1,6 @@
 #include "heap.h"
 #include "trie.h"
-#define POOL_SIZE 30
+#define POOL_SIZE 50
 
 extern pthread_mutex_t head_mtx;
 extern pthread_mutex_t queue_mtx;
