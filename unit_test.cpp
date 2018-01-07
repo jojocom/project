@@ -7,10 +7,9 @@
 #include <fcntl.h>
 #include <fstream>
 #include <stdint.h>
-#include "trie.h"
 #include "list.h"
 #include "hash_functions.h"
-#include "heap.h"
+#include "jobScheduler.h"
 
 using namespace std;
 
@@ -254,6 +253,80 @@ int main(int argc, char *argv[]) {
     assert(strcmp(el1->word,heapword1) == 0);
     assert(el1->occurrences == 2);
     delete el1;
+//  check  submit obtain
+
+
+    JobScheduler *sch = new JobScheduler(6);
+    assert(sch->queue != NULL);
+    assert(sch->tids != NULL);
+
+    pthread_mutex_init(&queue_mtx, 0);
+    pthread_cond_init(&cond_nonempty, 0);
+    pthread_cond_init(&cond_nonfull, 0);
+
+
+    char **query = (char **) malloc(sizeof(char *)*2);
+    query[0] = (char *) malloc(sizeof(char)*(strlen("garcia")+1));
+    strcpy(query[0],"garcia");
+    query[1] = (char *) malloc(sizeof(char)*(strlen("above")+1));
+    strcpy(query[1],"above");
+
+
+    Job *job1 = new Job(1,2,query,0);
+    Job *job2 = new Job(2,2,query,1);
+    sch->submit_job(job1);
+    sch->submit_job(job2);
+
+    // assert inside queue
+
+    assert(sch->queue->data[sch->queue->start]->id == 1);
+    assert(sch->queue->data[sch->queue->start]->queryLen == 2);
+    assert(strcmp(sch->queue->data[sch->queue->start]->query[0],"garcia")==0);
+    assert(strcmp(sch->queue->data[sch->queue->start]->query[1],"above")==0);
+    assert(sch->queue->data[sch->queue->start]->prevCommands == 0);
+
+    assert(sch->queue->data[sch->queue->start+1]->id == 2);
+    assert(sch->queue->data[sch->queue->start+1]->queryLen == 2);
+    assert(strcmp(sch->queue->data[sch->queue->start+1]->query[0],"garcia")==0);
+    assert(strcmp(sch->queue->data[sch->queue->start+1]->query[1],"above")==0);
+    assert(sch->queue->data[sch->queue->start+1]->prevCommands == 1);
+
+
+    Job *test1;
+    test1 = sch->obtain();
+
+    // assert for object
+
+    assert(test1->id == 1);
+    assert(test1->queryLen == 2);
+    assert(strcmp(test1->query[0],"garcia")==0);
+    assert(strcmp(test1->query[1],"above")==0);
+    assert(test1->prevCommands == 0);
+
+    delete test1;
+    Job *test2;
+    test2 = sch->obtain();
+
+    // assert for object2
+
+    assert(test2->id == 2);
+    assert(test2->queryLen == 2);
+    assert(strcmp(test2->query[0],"garcia")==0);
+    assert(strcmp(test2->query[1],"above")==0);
+    assert(test2->prevCommands == 1);
+
+
+    delete test2;
+    delete sch;
+    for (int i = 0; i < 2; i++) {
+        free(query[i]);
+    }
+    free(query);
+
+    pthread_cond_destroy(&cond_nonempty);
+    pthread_cond_destroy(&cond_nonfull);
+    pthread_mutex_destroy(&queue_mtx);
+
 
     free(heapword1);
     free(heapword2);
