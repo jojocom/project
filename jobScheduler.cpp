@@ -21,8 +21,6 @@ pthread_cond_t cond_nonempty;
 pthread_cond_t cond_nonfull;
 Parameter *threadParameter;
 
-pthread_mutex_t queue_mtx1;
-
 Job::Job(int newid,int newqueryLen,char **newquery,int newPrevCommands):id(newid),queryLen(newqueryLen),prevCommands(newPrevCommands) {
     query = (char **) malloc(sizeof(char *)*newqueryLen);
     for (int i = 0; i < newqueryLen; i++) {
@@ -38,7 +36,7 @@ Job::~Job() {
     free(query);
 }
 
-Queue::Queue():start(0),end(-1),count(0) {
+Queue::Queue():start(0),end(-1),count(0),todo(0) {
     for (int i = 0; i < POOL_SIZE; i++) {
         data[i] = NULL;
     }
@@ -77,7 +75,6 @@ void *executeDynamic(void *arg){
     JobScheduler *scheduler = threadParameter->scheduler;
 
     while(1){
-        // std::cout << "while" << '\n';
         Job *job = scheduler->obtain();     // obtain from scheduler's queue
         MaxHeap *heap = threadParameter->heap;
         char **printer = threadParameter->printer;
@@ -89,7 +86,7 @@ void *executeDynamic(void *arg){
         int whitespace = job->queryLen - 1;
         int prevCommands = job->prevCommands;
         if(strcmp(query[0],"poison") == 0){
-            break;
+            return NULL;
         }
 
         uint32_t bitArray[M];
@@ -162,6 +159,12 @@ void *executeDynamic(void *arg){
                 strcpy(printer[id - prevCommands],"-1");
             }
         }
+        pthread_mutex_lock(&queue_mtx);
+        scheduler->queue->todo--;
+        if (scheduler->queue->todo == 0) {
+            pthread_cond_signal(&cond_empty);
+        }
+        pthread_mutex_unlock(&queue_mtx);
     }
 
     return NULL;
@@ -169,12 +172,12 @@ void *executeDynamic(void *arg){
 
 void *executeStatic(void *arg){
     Head *head = threadParameter->head;
-    MaxHeap *heap = threadParameter->heap;
     JobScheduler *scheduler = threadParameter->scheduler;
-    char **printer = threadParameter->printer;
 
     while(1){
         Job *job = scheduler->obtain();     // obtain from scheduler's queue
+        MaxHeap *heap = threadParameter->heap;
+        char **printer = threadParameter->printer;
         if (job == NULL) {
             cout << "null" << endl;
         }
@@ -182,7 +185,7 @@ void *executeStatic(void *arg){
         char **query = job->query;
         int whitespace = job->queryLen - 1;
         if(strcmp(query[0],"poison") == 0){
-            break;
+            return NULL;
         }
 
         uint32_t bitArray[M];
@@ -251,6 +254,12 @@ void *executeStatic(void *arg){
                 strcpy(printer[id],"-1");
             }
         }
+        pthread_mutex_lock(&queue_mtx);
+        scheduler->queue->todo--;
+        if (scheduler->queue->todo == 0) {
+            pthread_cond_signal(&cond_empty);
+        }
+        pthread_mutex_unlock(&queue_mtx);
     }
 
     return NULL;

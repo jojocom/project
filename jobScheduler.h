@@ -10,8 +10,6 @@ extern pthread_cond_t cond_empty;
 extern pthread_cond_t cond_nonempty;
 extern pthread_cond_t cond_nonfull;
 
-extern pthread_mutex_t queue_mtx1;
-
 class Job {
 public:
     int id;
@@ -29,6 +27,7 @@ public:
     int start;
     int end;
     int count;
+    int todo;
 
     Queue();
     ~Queue();

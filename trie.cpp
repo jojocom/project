@@ -11,7 +11,7 @@
 #include "hash_functions.h"
 #include "jobScheduler.h"
 #define STARTSIZE 20
-#define THREADSNUM 14
+#define THREADSNUM 1
 
 using namespace std;
 
@@ -1013,10 +1013,8 @@ void queryRead(char *queryFileName,Head *head){
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
-    pthread_mutex_init(&queue_mtx1, 0);
-
     threadParameter = new Parameter(head,heap,scheduler);
-
+    scheduler->execute_all_jobs(0);
     string line;
     ifstream queryFile( queryFileName );
     if (queryFile) {
@@ -1061,11 +1059,10 @@ void queryRead(char *queryFileName,Head *head){
                 currentSize = 2*currentSize;
             }
             if (strcmp(query[0],"Q") == 0 ){
-                // std::cout << "Q" << '\n';
                 jobsArray[counter - prevCommands] = new Job(counter,whitespace+1,query,prevCommands);
+                scheduler->queue->todo++;
                 counter++;
             } else if (strcmp(query[0],"A") == 0 ){
-                // std::cout << "A" << '\n';
                 insertNgram(queryStart,whitespace,head,counter);
                 jobsArray[counter - prevCommands] = new Job(-1,whitespace+1,query,0);
                 counter++;
@@ -1074,13 +1071,12 @@ void queryRead(char *queryFileName,Head *head){
                 jobsArray[counter - prevCommands] = new Job(-2,whitespace+1,query,0);
                 counter++;
             } else if (strcmp(query[0],"F") == 0){
-                // std::cout << "F" << '\n';
                 char **printer = (char **) malloc(sizeof(char *)*(counter - prevCommands));
                 for (int i = 0; i < counter - prevCommands; i++) {
                     printer[i] = NULL;
                 }
                 threadParameter->printer = printer;
-                scheduler->execute_all_jobs(0);
+
                 for (int i = 0; i < counter - prevCommands; i++) {
                     if (jobsArray[i] != NULL) {
                         if (jobsArray[i]->id >= 0) {
@@ -1089,22 +1085,11 @@ void queryRead(char *queryFileName,Head *head){
                     }
                 }
 
-                // poisoning threads
-                char **poison = (char **) malloc(sizeof(char*));
-                poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
-                strcpy(poison[0],"poison");
-                Job *poisonJob = new Job(-1,1,poison,0);
-                for (int i = 0; i < THREADSNUM; i++) {
-                    scheduler->submit_job(poisonJob);
+                pthread_mutex_lock(&queue_mtx);
+                while (scheduler->queue->todo != 0) {
+                    pthread_cond_wait(&cond_empty,&queue_mtx);
                 }
-                // wait threads
-                int err;
-                for (int i = 0; i < THREADSNUM; i++) {
-                    if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
-                        perror("pthread_join");
-                        exit(1);
-                    }
-                }
+                pthread_mutex_unlock(&queue_mtx);
 
                 for (int i = 0; i < counter - prevCommands; i++) {
                     if (printer[i] != NULL) {
@@ -1138,17 +1123,6 @@ void queryRead(char *queryFileName,Head *head){
                         cout << endl;
                     }
                 }
-                // std::cout << "hereeeee" << '\n';
-                // noInsertNgram
-                // for (int i = 0; i < counter - prevCommands; i++) {
-                //     if (jobsArray[i] != NULL) {
-                //         if (jobsArray[i]->id == -1) {
-                //             // std::cout << "before cleanup " << i << '\n';
-                //             cleanup(jobsArray[i]->query + 1,jobsArray[i]->queryLen-1,head,counter);
-                //             // std::cout << "after cleanup " << i << '\n';
-                //         }
-                //     }
-                // }
                 // deleteNgram
                 for (int i = 0; i < counter - prevCommands; i++) {
                     if (jobsArray[i] != NULL) {
@@ -1157,44 +1131,48 @@ void queryRead(char *queryFileName,Head *head){
                         }
                     }
                 }
-                // std::cout << "thereeeeee" << '\n';
                 delete heap;
-                // std::cout << "1" << '\n';
                 heap = new MaxHeap(HeapCap);
-                // std::cout << "2" << '\n';
                 threadParameter->heap = heap;
-                // delete poisonJob
-                delete poisonJob;
-                free(poison[0]);
-                free(poison);
                 // delete jobs array
-                // std::cout << "3" << '\n';
                 for (int i = 0; i < counter - prevCommands; i++) {
-                    // std::cout << "before i: " << i << '\n';
                     delete jobsArray[i];
-                    // std::cout << "before i: " << i << '\n';
                 }
-                // std::cout << "4" << '\n';
                 free(jobsArray);
-                // std::cout << "5" << '\n';
                 // create new array
                 jobsArray = (Job **) malloc(sizeof(Job *)*STARTSIZE);
                 for (int i = 0; i < STARTSIZE; i++) {
                     jobsArray[i] = NULL;
                 }
                 currentSize = STARTSIZE;
-                // counter = 0;
                 prevCommands = counter;
-                // std::cout << "F end" << '\n';
             }
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);
             }
             free(query);
             free(cline);
-            // std::cout << "end" << '\n';
         }
-
+        // poisoning threads
+        char **poison = (char **) malloc(sizeof(char*));
+        poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
+        strcpy(poison[0],"poison");
+        Job *poisonJob = new Job(-1,1,poison,0);
+        for (int i = 0; i < THREADSNUM; i++) {
+            scheduler->submit_job(poisonJob);
+        }
+        // wait threads
+        int err;
+        for (int i = 0; i < THREADSNUM; i++) {
+            if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
+                perror("pthread_join");
+                exit(1);
+            }
+        }
+        // delete poisonJob
+        delete poisonJob;
+        free(poison[0]);
+        free(poison);
         queryFile.close();
         free(jobsArray);
     }
@@ -1205,8 +1183,6 @@ void queryRead(char *queryFileName,Head *head){
     pthread_mutex_destroy(&heap_mtx);
     pthread_mutex_destroy(&queue_mtx);
     pthread_mutex_destroy(&head_mtx);
-
-    pthread_mutex_destroy(&queue_mtx1);
 
     delete threadParameter;
 }
@@ -1361,6 +1337,7 @@ void queryStaticRead(char *queryFileName,Head *head){
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
     threadParameter = new Parameter(head,heap,scheduler);
+    scheduler->execute_all_jobs(1);
     string line;
     ifstream queryFile( queryFileName );
     if (queryFile) {
@@ -1404,29 +1381,22 @@ void queryStaticRead(char *queryFileName,Head *head){
             }
             jobsArray[counter] = new Job(counter,whitespace+1,query,0);
             counter++;
+            scheduler->queue->todo++;
             if (strcmp(query[0],"F") == 0){
+                scheduler->queue->todo--;
                 char **printer = (char **) malloc(sizeof(char *)*(counter-1));
                 threadParameter->printer = printer;
-                scheduler->execute_all_jobs(1);
+
                 for (int i = 0; i < counter-1; i++) {
                     scheduler->submit_job(jobsArray[i]);
                 }
-                // poisoning threads
-                char **poison = (char **) malloc(sizeof(char*));
-                poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
-                strcpy(poison[0],"poison");
-                Job *poisonJob = new Job(-1,1,poison,0);
-                for (int i = 0; i < THREADSNUM; i++) {
-                    scheduler->submit_job(poisonJob);
+
+                pthread_mutex_lock(&queue_mtx);
+                while (scheduler->queue->todo != 0) {
+                    pthread_cond_wait(&cond_empty,&queue_mtx);
                 }
-                // wait threads
-                int err;
-                for (int i = 0; i < THREADSNUM; i++) {
-                    if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
-                        perror("pthread_join");
-                        exit(1);
-                    }
-                }
+                pthread_mutex_unlock(&queue_mtx);
+
                 for (int i = 0; i < counter-1; i++) {
                     cout << printer[i] << endl;
                 }
@@ -1457,10 +1427,7 @@ void queryStaticRead(char *queryFileName,Head *head){
                 delete heap;
                 heap = new MaxHeap(HeapCap);
                 threadParameter->heap = heap;
-                // delete poisonJob
-                delete poisonJob;
-                free(poison[0]);
-                free(poison);
+
                 // delete jobs array
                 for (int i = 0; i < counter; i++) {
                     delete jobsArray[i];
@@ -1480,6 +1447,27 @@ void queryStaticRead(char *queryFileName,Head *head){
             free(query);
             free(cline);
         }
+        // poisoning threads
+        char **poison = (char **) malloc(sizeof(char*));
+        poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
+        strcpy(poison[0],"poison");
+        Job *poisonJob = new Job(-1,1,poison,0);
+        for (int i = 0; i < THREADSNUM; i++) {
+            scheduler->submit_job(poisonJob);
+        }
+        // wait threads
+        int err;
+        for (int i = 0; i < THREADSNUM; i++) {
+            if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
+                perror("pthread_join");
+                exit(1);
+            }
+        }
+        // delete poisonJob
+        delete poisonJob;
+        free(poison[0]);
+        free(poison);
+
         queryFile.close();
         free(jobsArray);
     }
