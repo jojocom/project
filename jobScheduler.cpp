@@ -16,11 +16,14 @@ pthread_mutex_t head_mtx;
 pthread_mutex_t queue_mtx;
 pthread_mutex_t heap_mtx;
 pthread_mutex_t printer_mtx;
+pthread_cond_t cond_empty;
 pthread_cond_t cond_nonempty;
 pthread_cond_t cond_nonfull;
 Parameter *threadParameter;
 
-Job::Job(int newid,int newqueryLen,char **newquery):id(newid),queryLen(newqueryLen) {
+pthread_mutex_t queue_mtx1;
+
+Job::Job(int newid,int newqueryLen,char **newquery,int newPrevCommands):id(newid),queryLen(newqueryLen),prevCommands(newPrevCommands) {
     query = (char **) malloc(sizeof(char *)*newqueryLen);
     for (int i = 0; i < newqueryLen; i++) {
         query[i] = (char *) malloc(sizeof(char)*(strlen(newquery[i]) + 1));
@@ -71,19 +74,20 @@ void JobScheduler::submit_job(Job* data) {
 void *executeDynamic(void *arg){
     // std::cout << "thread" << '\n';
     Head *head = threadParameter->head;
-    MaxHeap *heap = threadParameter->heap;
     JobScheduler *scheduler = threadParameter->scheduler;
-    char **printer = threadParameter->printer;
 
     while(1){
         // std::cout << "while" << '\n';
         Job *job = scheduler->obtain();     // obtain from scheduler's queue
+        MaxHeap *heap = threadParameter->heap;
+        char **printer = threadParameter->printer;
         if (job == NULL) {
             cout << "null" << endl;
         }
         int id = job->id;
         char **query = job->query;
         int whitespace = job->queryLen - 1;
+        int prevCommands = job->prevCommands;
         if(strcmp(query[0],"poison") == 0){
             break;
         }
@@ -133,13 +137,13 @@ void *executeDynamic(void *arg){
                             bitArray[((hash3+hash1)%(M*32))/32] = bitChanger(bitArray[((hash3+hash1)%(M*32))/32],((hash3+hash1)%(M*32))%32);
                             // std::cout << "before printer" << '\n';
                             if(found == 0){
-                                printer[id] = (char *) malloc(sizeof(char)*(strlen(mykey)+1));
-                                strcpy(printer[id],mykey);
+                                printer[id - prevCommands] = (char *) malloc(sizeof(char)*(strlen(mykey)+1));
+                                strcpy(printer[id - prevCommands],mykey);
                             } else{
-                                int currentLen = strlen(printer[id]);
-                                printer[id] = (char *) realloc(printer[id], sizeof(char)*(currentLen+strlen(mykey)+2));
-                                strcat(printer[id],"|");
-                                strcat(printer[id],mykey);
+                                int currentLen = strlen(printer[id - prevCommands]);
+                                printer[id - prevCommands] = (char *) realloc(printer[id - prevCommands], sizeof(char)*(currentLen+strlen(mykey)+2));
+                                strcat(printer[id - prevCommands],"|");
+                                strcat(printer[id - prevCommands],mykey);
                             }
                             // std::cout << "after printer" << '\n';
                             pthread_mutex_lock(&heap_mtx);
@@ -154,8 +158,8 @@ void *executeDynamic(void *arg){
                 }
             }
             if(found == 0){     // if there are no Ngrams int the query
-                printer[id] = (char *) malloc(sizeof(char)*(3));
-                strcpy(printer[id],"-1");
+                printer[id - prevCommands] = (char *) malloc(sizeof(char)*(3));
+                strcpy(printer[id - prevCommands],"-1");
             }
         }
     }

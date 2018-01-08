@@ -6,16 +6,20 @@ extern pthread_mutex_t head_mtx;
 extern pthread_mutex_t queue_mtx;
 extern pthread_mutex_t heap_mtx;
 extern pthread_mutex_t printer_mtx;
+extern pthread_cond_t cond_empty;
 extern pthread_cond_t cond_nonempty;
 extern pthread_cond_t cond_nonfull;
+
+extern pthread_mutex_t queue_mtx1;
 
 class Job {
 public:
     int id;
     int queryLen;
     char **query;
+    int prevCommands;
 
-    Job(int newid,int newqueryLen,char **newquery);
+    Job(int newid,int newqueryLen,char **newquery,int newPrevCommands);
     ~Job();
 };
 

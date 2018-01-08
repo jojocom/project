@@ -998,8 +998,7 @@ void queryRead(char *queryFileName,Head *head){
     // std::cout << "queryRead" << '\n';
     MaxHeap *heap = new MaxHeap(HeapCap);    // heap create
     int counter = 0;
-    // int addcounter = 0;
-    // int delcounter = 0;
+    int prevCommands = 0;
     int currentSize = STARTSIZE;
     Job **jobsArray = (Job **) malloc(sizeof(Job *)*STARTSIZE);
     for (int i = 0; i < STARTSIZE; i++) {
@@ -1010,9 +1009,14 @@ void queryRead(char *queryFileName,Head *head){
     pthread_mutex_init(&queue_mtx, 0);
     pthread_mutex_init(&heap_mtx, 0);
     pthread_mutex_init(&printer_mtx, 0);
+    pthread_cond_init(&cond_empty, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
+
+    pthread_mutex_init(&queue_mtx1, 0);
+
     threadParameter = new Parameter(head,heap,scheduler);
+
     string line;
     ifstream queryFile( queryFileName );
     if (queryFile) {
@@ -1049,7 +1053,7 @@ void queryRead(char *queryFileName,Head *head){
                 temp = position + 1;
             }
             char **queryStart = query + 1;
-            if(counter == currentSize){
+            if(counter - prevCommands == currentSize){
                 jobsArray = (Job **) realloc(jobsArray,sizeof(Job *)*currentSize*2);
                 for (int i = currentSize; i < 2*currentSize; i++) {
                     jobsArray[i] = NULL;
@@ -1058,68 +1062,56 @@ void queryRead(char *queryFileName,Head *head){
             }
             if (strcmp(query[0],"Q") == 0 ){
                 // std::cout << "Q" << '\n';
-                jobsArray[counter] = new Job(counter,whitespace+1,query);
+                jobsArray[counter - prevCommands] = new Job(counter,whitespace+1,query,prevCommands);
                 counter++;
             } else if (strcmp(query[0],"A") == 0 ){
                 // std::cout << "A" << '\n';
                 insertNgram(queryStart,whitespace,head,counter);
-                jobsArray[counter] = new Job(-1,whitespace+1,query);
+                jobsArray[counter - prevCommands] = new Job(-1,whitespace+1,query,0);
                 counter++;
             } else if (strcmp(query[0],"D") == 0) {
-                // std::cout << "D" << '\n';
                 noDeleteNgram(queryStart,whitespace,head,counter);
-                // std::cout << "before" << '\n';
-                jobsArray[counter] = new Job(-2,whitespace+1,query);
+                jobsArray[counter - prevCommands] = new Job(-2,whitespace+1,query,0);
                 counter++;
-                // std::cout << "after" << '\n';
             } else if (strcmp(query[0],"F") == 0){
                 // std::cout << "F" << '\n';
-                char **printer = (char **) malloc(sizeof(char *)*(counter));
-                for (int i = 0; i < counter; i++) {
+                char **printer = (char **) malloc(sizeof(char *)*(counter - prevCommands));
+                for (int i = 0; i < counter - prevCommands; i++) {
                     printer[i] = NULL;
                 }
-                // std::cout << "111" << '\n';
                 threadParameter->printer = printer;
-                // std::cout << "before create" << '\n';
                 scheduler->execute_all_jobs(0);
-                // std::cout << "after create" << '\n';
-                // std::cout << "counter: " << counter << '\n';
-                for (int i = 0; i < counter; i++) {
-                    // std::cout << "i: " << i << '\n';
+                for (int i = 0; i < counter - prevCommands; i++) {
                     if (jobsArray[i] != NULL) {
                         if (jobsArray[i]->id >= 0) {
                             scheduler->submit_job(jobsArray[i]);
                         }
                     }
                 }
-                // std::cout << "after submit" << '\n';
+
                 // poisoning threads
                 char **poison = (char **) malloc(sizeof(char*));
                 poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
                 strcpy(poison[0],"poison");
-                Job *poisonJob = new Job(-1,1,poison);
+                Job *poisonJob = new Job(-1,1,poison,0);
                 for (int i = 0; i < THREADSNUM; i++) {
                     scheduler->submit_job(poisonJob);
                 }
                 // wait threads
                 int err;
-                // // std::cout << "before join" << '\n';
                 for (int i = 0; i < THREADSNUM; i++) {
                     if ((err = pthread_join(*(scheduler->tids + i), NULL))) { // Wait for thread termination
                         perror("pthread_join");
                         exit(1);
                     }
                 }
-                // std::cout << "after join" << '\n';
-                // std::cout << "counter: " << counter << '\n';
-                for (int i = 0; i < counter; i++) {
-                    // std::cout << "before printer: " << i << '\n';
+
+                for (int i = 0; i < counter - prevCommands; i++) {
                     if (printer[i] != NULL) {
                         cout << printer[i] << endl;
                     }
-                    // std::cout << "after printer: " << i << '\n';
                 }
-                for (int i = 0; i < counter; i++) {
+                for (int i = 0; i < counter - prevCommands; i++) {
                     if (printer[i] != NULL) {
                         free(printer[i]);
                     }
@@ -1145,83 +1137,77 @@ void queryRead(char *queryFileName,Head *head){
                         }
                         cout << endl;
                     }
-                    // cout << "Top: ";
-                    // for (int i = 0; i < k; i++) {
-                    //     pthread_mutex_lock(&heap_mtx);
-                    //     Element *el1 = heap->extractMax();
-                    //     pthread_mutex_unlock(&heap_mtx);
-                    //     if(el1 != NULL){
-                    //         if( i == k-1){
-                    //             cout << el1->word << endl;
-                    //         } else{
-                    //             cout << el1->word << "|";
-                    //         }
-                    //         if(heap->elements != 0){
-                    //             delete el1;
-                    //         }
-                    //     }
-                    //     // else{
-                    //     //     cout << endl;
-                    //     // }
-                    // }
                 }
-
+                // std::cout << "hereeeee" << '\n';
                 // noInsertNgram
-                for (int i = 0; i < counter; i++) {
-                    if (jobsArray[i] != NULL) {
-                        if (jobsArray[i]->id == -1) {
-                            // std::cout << "before cleanup " << i << '\n';
-                            cleanup(jobsArray[i]->query + 1,jobsArray[i]->queryLen-1,head,counter);
-                            // std::cout << "after cleanup " << i << '\n';
-                        }
-                    }
-                }
+                // for (int i = 0; i < counter - prevCommands; i++) {
+                //     if (jobsArray[i] != NULL) {
+                //         if (jobsArray[i]->id == -1) {
+                //             // std::cout << "before cleanup " << i << '\n';
+                //             cleanup(jobsArray[i]->query + 1,jobsArray[i]->queryLen-1,head,counter);
+                //             // std::cout << "after cleanup " << i << '\n';
+                //         }
+                //     }
+                // }
                 // deleteNgram
-                for (int i = 0; i < counter; i++) {
+                for (int i = 0; i < counter - prevCommands; i++) {
                     if (jobsArray[i] != NULL) {
                         if (jobsArray[i]->id == -2) {
-                            // std::cout << "before delete " << i << '\n';
                             deleteNgram(jobsArray[i]->query + 1,jobsArray[i]->queryLen-1,head,counter);
-                            // std::cout << "after delete " << i << '\n';
                         }
                     }
                 }
-
+                // std::cout << "thereeeeee" << '\n';
                 delete heap;
+                // std::cout << "1" << '\n';
                 heap = new MaxHeap(HeapCap);
+                // std::cout << "2" << '\n';
                 threadParameter->heap = heap;
                 // delete poisonJob
                 delete poisonJob;
                 free(poison[0]);
                 free(poison);
                 // delete jobs array
-                for (int i = 0; i < counter; i++) {
+                // std::cout << "3" << '\n';
+                for (int i = 0; i < counter - prevCommands; i++) {
+                    // std::cout << "before i: " << i << '\n';
                     delete jobsArray[i];
+                    // std::cout << "before i: " << i << '\n';
                 }
+                // std::cout << "4" << '\n';
                 free(jobsArray);
+                // std::cout << "5" << '\n';
                 // create new array
                 jobsArray = (Job **) malloc(sizeof(Job *)*STARTSIZE);
                 for (int i = 0; i < STARTSIZE; i++) {
                     jobsArray[i] = NULL;
                 }
                 currentSize = STARTSIZE;
-                counter = 0;
+                // counter = 0;
+                prevCommands = counter;
+                // std::cout << "F end" << '\n';
             }
             for(int i = 0; i <= whitespace; i++){
                 free(query[i]);
             }
             free(query);
             free(cline);
+            // std::cout << "end" << '\n';
         }
+
         queryFile.close();
         free(jobsArray);
     }
     pthread_cond_destroy(&cond_nonempty);
     pthread_cond_destroy(&cond_nonfull);
+    pthread_cond_destroy(&cond_empty);
     pthread_mutex_destroy(&printer_mtx);
     pthread_mutex_destroy(&heap_mtx);
     pthread_mutex_destroy(&queue_mtx);
     pthread_mutex_destroy(&head_mtx);
+
+    pthread_mutex_destroy(&queue_mtx1);
+
     delete threadParameter;
 }
 
@@ -1416,7 +1402,7 @@ void queryStaticRead(char *queryFileName,Head *head){
                 }
                 currentSize = 2*currentSize;
             }
-            jobsArray[counter] = new Job(counter,whitespace+1,query);
+            jobsArray[counter] = new Job(counter,whitespace+1,query,0);
             counter++;
             if (strcmp(query[0],"F") == 0){
                 char **printer = (char **) malloc(sizeof(char *)*(counter-1));
@@ -1429,7 +1415,7 @@ void queryStaticRead(char *queryFileName,Head *head){
                 char **poison = (char **) malloc(sizeof(char*));
                 poison[0] = (char *) malloc(sizeof(char)*(strlen("poison")+1));
                 strcpy(poison[0],"poison");
-                Job *poisonJob = new Job(-1,1,poison);
+                Job *poisonJob = new Job(-1,1,poison,0);
                 for (int i = 0; i < THREADSNUM; i++) {
                     scheduler->submit_job(poisonJob);
                 }

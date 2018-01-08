@@ -5,7 +5,7 @@ OUT2	= unit
 CC		= g++
 FLAGS	= -c -Wall -O3
 
-all: main unit
+all: main
 
 # main
 
@@ -36,11 +36,11 @@ unit_test.o: unit_test.cpp
 unit: $(OBJS2)
 	$(CC) $(OBJS2) -o $(OUT2) -lpthread
 
-# temp.o: temp.cpp
-# 	$(CC) $(FLAGS) temp.cpp
-#
-# temp: temp.o
-# 	$(CC) temp.o jobScheduler.o  -o temp -lpthread
+temp.o: temp.cpp
+	$(CC) $(FLAGS) temp.cpp
+
+temp: temp.o
+	$(CC) temp.o trie.o list.o hash_functions.o heap.o jobScheduler.o -o temp -lpthread
 
 # clean up
 
